@@ -120,9 +120,9 @@ PURITY_MULTIPLIERS = {
 DEALERS = {
     "2268": {"name": "Ahmadreza", "level": "admin", "active": True, "permissions": ["buy", "sell", "admin"]},
     "2269": {"name": "Nima", "level": "senior", "active": True, "permissions": ["buy", "sell"]},
-    "2270": {"name": "Peiman", "level": "standard", "active": True, "permissions": ["buy"]},
+    "2270": {"name": "Peiman", "level": "standard", "active": True, "permissions": ["buy", "sell"]},
     "9999": {"name": "System Admin", "level": "admin", "active": True, "permissions": ["buy", "sell", "admin"]},
-    "7777": {"name": "Junior Dealer", "level": "junior", "active": True, "permissions": ["buy"]}
+    "7777": {"name": "Junior Dealer", "level": "junior", "active": True, "permissions": ["buy", "sell"]}
 }
 
 CUSTOMERS = ["Noori", "ASK", "AGM", "Keshavarz", "WSG", "Exness", "MyMaa", "Binance", "Kraken", "Custom"]
