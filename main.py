@@ -381,23 +381,23 @@ def fetch_gold_rate():
     return False
 
 def start_rate_updater():
-    """Start background rate updater for cloud deployment - FASTER UPDATES"""
+    """Start background rate updater for cloud deployment - LIVE UPDATES"""
     def update_loop():
         while True:
             try:
                 success = fetch_gold_rate()
                 if success:
-                    logger.info(f"🔄 Rate updated: ${market_data['gold_usd_oz']:.2f}")
+                    logger.info(f"🔄 LIVE Rate updated: ${market_data['gold_usd_oz']:.2f}")
                 else:
                     logger.warning("⚠️ Rate update failed, using cached value")
-                time.sleep(300)  # 5 minutes instead of 15 minutes
+                time.sleep(30)  # 30 seconds for LIVE updates!
             except Exception as e:
                 logger.error(f"❌ Rate updater error: {e}")
-                time.sleep(180)  # 3 minutes on error instead of 10
+                time.sleep(60)  # 1 minute on error
     
     thread = threading.Thread(target=update_loop, daemon=True)
     thread.start()
-    logger.info("✅ Background rate updater started - Updates every 5 minutes")
+    logger.info("✅ LIVE rate updater started - Updates every 30 seconds!")
 
 def get_sheets_client():
     """Get authenticated Google Sheets client with cloud-safe error handling"""
@@ -615,17 +615,19 @@ def start_command(message):
         
         markup.add(types.InlineKeyboardButton("💰 Live Gold Rate", callback_data="show_rate"))
         
-        welcome_text = f"""🥇 GOLD TRADING BOT v4.5 - RATE UPDATES & DECIMALS! ✨
+        welcome_text = f"""🥇 GOLD TRADING BOT v4.5 - LIVE RATES! ⚡
 🚀 Complete Trading System + Sheet Integration
 
 📊 SYSTEM STATUS:
-💰 Gold Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
+💰 LIVE Rate: {format_money(market_data['gold_usd_oz'])} USD/oz ⚡
 💱 AED Rate: {format_money_aed(market_data['gold_usd_oz'])}/oz
 📈 Trend: {market_data['trend'].title()}
+🔄 Updates: Every 30 seconds (LIVE!)
 ☁️ Cloud: Railway Platform (Always On)
 
-🔧 NEW IN v4.5:
-✅ Rate updates every 5 minutes (faster!)
+🆕 v4.5 FEATURES:
+✅ LIVE rate updates every 30 seconds!
+✅ Auto-refresh when viewing rates/trading
 ✅ Manual force refresh rate option
 ✅ Decimal quantities: 0.25, 2.5, etc.
 ✅ TT Bar weight: Exact 116.6380g (10 Tola)
@@ -813,12 +815,13 @@ def handle_show_rate(call):
         trend_emoji = {"up": "⬆️", "down": "⬇️", "stable": "➡️"}
         emoji = trend_emoji.get(market_data['trend'], "➡️")
         
-        rate_text = f"""💰 LIVE GOLD RATE - AUTO-REFRESHED
+        rate_text = f"""💰 LIVE GOLD RATE - REAL-TIME! ⚡
 
 🥇 Current: {format_money(market_data['gold_usd_oz'])} USD/oz
 💱 AED: {format_money_aed(market_data['gold_usd_oz'])}/oz
 {emoji} Trend: {market_data['trend'].title()}
-⏰ Updated: {market_data['last_update']} (Auto: Every 5min)
+⏰ Updated: {market_data['last_update']} 
+🔄 Next Update: ~30 seconds (LIVE!)
 
 📏 Quick Conversions (999 Purity):
 • 1 KG (32.15 oz): {format_money(market_data['gold_usd_oz'] * kg_to_oz(1) * 0.999)}
@@ -828,7 +831,7 @@ def handle_show_rate(call):
 • 999 (99.9%): {format_money(market_data['gold_usd_oz'] * 0.999)}/oz
 • 916 (22K): {format_money(market_data['gold_usd_oz'] * 0.916)}/oz
 
-☁️ Running 24/7 on Railway Cloud!"""
+☁️ Running 24/7 on Railway Cloud - LIVE RATES!"""
         
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔄 Force Refresh", callback_data="show_rate"))
@@ -839,8 +842,11 @@ def handle_show_rate(call):
         logger.error(f"Show rate error: {e}")
 
 def handle_dashboard(call):
-    """Dashboard"""
+    """Dashboard - WITH LIVE RATE REFRESH"""
     try:
+        # AUTO-REFRESH RATE WHEN VIEWING DASHBOARD
+        fetch_gold_rate()
+        
         user_id = call.from_user.id
         session = user_sessions.get(user_id, {})
         dealer = session.get("dealer")
@@ -863,13 +869,15 @@ def handle_dashboard(call):
         markup.add(types.InlineKeyboardButton("🔧 System Status", callback_data="system_status"))
         markup.add(types.InlineKeyboardButton("🔙 Logout", callback_data="start"))
         
-        dashboard_text = f"""✅ DEALER DASHBOARD v4.5 - FASTER RATE UPDATES! ✨
+        dashboard_text = f"""✅ DEALER DASHBOARD v4.5 - LIVE RATES! ✨
 
 👤 Welcome {dealer['name'].upper()}!
 🔒 Level: {dealer['level'].title()}
 🎯 Permissions: {', '.join(permissions).upper()}
 
-💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz (Updates every 5min)
+💰 LIVE Rate: {format_money(market_data['gold_usd_oz'])} USD/oz ⚡
+💱 AED: {format_money_aed(market_data['gold_usd_oz'])}/oz
+⏰ Just Updated: {market_data['last_update']} (Live every 30sec)
 
 🎯 COMPLETE TRADING SYSTEM:
 ✅ All Gold Types (Kilo, TT=116.64g, 100g, Tola=11.66g, Custom)
@@ -878,7 +886,7 @@ def handle_dashboard(call):
 ✅ DECIMAL Quantities (0.25, 2.5, etc.)
 ✅ Professional Sheet Integration
 ✅ Beautiful Gold-Themed Formatting
-✅ FASTER rate updates (5min vs 15min)
+✅ LIVE rate updates (30sec intervals)
 ✅ Manual force refresh option{chr(10) + '✅ Sheet Management (Admin Access)' if 'admin' in permissions else ''}
 
 👆 SELECT ACTION:"""
@@ -888,8 +896,11 @@ def handle_dashboard(call):
         logger.error(f"Dashboard error: {e}")
 
 def handle_new_trade(call):
-    """New trade - COMPLETE TRADING FLOW"""
+    """New trade - COMPLETE TRADING FLOW WITH LIVE RATE"""
     try:
+        # AUTO-REFRESH RATE WHEN STARTING NEW TRADE
+        fetch_gold_rate()
+        
         user_id = call.from_user.id
         session_data = user_sessions.get(user_id, {})
         dealer = session_data.get("dealer")
@@ -916,7 +927,8 @@ def handle_new_trade(call):
 
 👤 Dealer: {dealer['name']}
 🔐 Permissions: {', '.join(permissions).upper()}
-💰 Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
+💰 LIVE Rate: {format_money(market_data['gold_usd_oz'])} USD/oz ⚡
+⏰ Updated: {market_data['last_update']}
 
 🎯 SELECT OPERATION:""",
             call.message.chat.id,
@@ -924,7 +936,7 @@ def handle_new_trade(call):
             reply_markup=markup
         )
         
-        logger.info(f"📊 User {user_id} started COMPLETE trade v4.5")
+        logger.info(f"📊 User {user_id} started LIVE trade v4.5")
     except Exception as e:
         logger.error(f"New trade error: {e}")
 
@@ -1347,8 +1359,11 @@ Type name now:""",
         logger.error(f"Customer error: {e}")
 
 def handle_rate_choice(call):
-    """Handle rate choice - COMPLETE WITH RATE OVERRIDE"""
+    """Handle rate choice - COMPLETE WITH RATE OVERRIDE AND LIVE RATE"""
     try:
+        # AUTO-REFRESH RATE WHEN SELECTING RATE OPTION
+        fetch_gold_rate()
+        
         user_id = call.from_user.id
         choice = call.data.replace("rate_", "")
         
@@ -1374,7 +1389,8 @@ def handle_rate_choice(call):
             bot.edit_message_text(
                 f"""📊 NEW TRADE - STEP 7/8 (PREMIUM/DISCOUNT)
 
-✅ Rate: Market Rate (${current_spot:,.2f}/oz)
+✅ Rate: LIVE Market Rate (${current_spot:,.2f}/oz) ⚡
+⏰ Updated: {market_data['last_update']}
 
 🎯 SELECT PREMIUM OR DISCOUNT:
 
@@ -1399,7 +1415,8 @@ def handle_rate_choice(call):
             bot.edit_message_text(
                 f"""✏️ ENTER CUSTOM RATE PER OUNCE
 
-💰 Current Market: ${current_market:,.2f} USD/oz
+💰 LIVE Market: ${current_market:,.2f} USD/oz ⚡
+⏰ Updated: {market_data['last_update']}
 
 💬 Enter your rate per ounce in USD
 📝 Example: 2650.00
@@ -1424,7 +1441,8 @@ Type your rate per ounce now:""",
             bot.edit_message_text(
                 f"""⚡ RATE OVERRIDE - ENTER FINAL RATE
 
-💰 Market Rate: ${current_market:,.2f} USD/oz (reference only)
+💰 LIVE Market: ${current_market:,.2f} USD/oz ⚡ (reference only)
+⏰ Updated: {market_data['last_update']}
 
 🎯 Enter the FINAL rate per ounce
 📝 This will be used directly in calculations
@@ -1773,19 +1791,19 @@ def handle_system_status(call):
         sheets_success, sheets_message = test_sheets_connection()
         total_sessions = len(user_sessions)
         
-        status_text = f"""🔧 SYSTEM STATUS v4.5 - FASTER RATE UPDATES! ✅
+        status_text = f"""🔧 SYSTEM STATUS v4.5 - LIVE RATES! ⚡
 
 📊 CORE SYSTEMS:
 • Bot Status: ✅ ONLINE (Railway Cloud)
 • Cloud Platform: Railway (24/7 operation)
 • Auto-restart: ✅ ENABLED
 
-💰 MARKET DATA:
-• Gold Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
+💰 LIVE MARKET DATA:
+• Gold Rate: {format_money(market_data['gold_usd_oz'])} USD/oz ⚡
 • AED Rate: {format_money_aed(market_data['gold_usd_oz'])}/oz
 • Trend: {market_data['trend'].title()}
 • Last Update: {market_data['last_update']}
-• Update Frequency: Every 5 minutes ⚡
+• Update Frequency: Every 30 seconds (LIVE!) ⚡
 
 📊 CONNECTIVITY:
 • Google Sheets: {'✅ Connected' if sheets_success else '❌ Failed'}
@@ -1804,8 +1822,9 @@ def handle_system_status(call):
 ✅ All Handlers Complete
 ✅ Sheet Management Tools
 
-🆕 v4.5 NEW FEATURES:
-✅ Rate updates every 5 minutes (3x faster!)
+⚡ v4.5 LIVE FEATURES:
+✅ LIVE rate updates every 30 seconds!
+✅ Auto-refresh on dashboard/trade views
 ✅ Manual force refresh rate option
 ✅ Decimal quantities (0.25, 2.5, etc.)
 ✅ TT Bar weight: Exact 116.6380g (10 Tola)
@@ -2411,10 +2430,10 @@ def handle_text(message):
                     user_id, 
                     f"""✅ Welcome {dealer['name']}! 
 
-🥇 Gold Trading Bot v4.5 - COMPLETE
+🥇 Gold Trading Bot v4.5 - LIVE RATES! ⚡
 🚀 All trading features + Sheet integration
-💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
-⚡ Updates every 5 minutes + manual refresh
+💰 LIVE Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
+⚡ Updates every 30 seconds + manual refresh
 
 Ready for professional gold trading!""", 
                     reply_markup=markup
@@ -2619,10 +2638,11 @@ def main():
     """Main function optimized for Railway cloud deployment"""
     try:
         logger.info("=" * 60)
-        logger.info("🥇 GOLD TRADING BOT v4.5 - RATE UPDATES & DECIMAL QUANTITIES!")
+        logger.info("🥇 GOLD TRADING BOT v4.5 - LIVE RATES & DECIMAL QUANTITIES!")
         logger.info("=" * 60)
-        logger.info("🆕 NEW FEATURES:")
-        logger.info("✅ Rate updates every 5 minutes (3x faster!)")
+        logger.info("⚡ LIVE FEATURES:")
+        logger.info("✅ LIVE rate updates every 30 seconds!")
+        logger.info("✅ Auto-refresh on dashboard/trade views")
         logger.info("✅ Manual force refresh rate option")
         logger.info("✅ Decimal quantities (0.25, 2.5, etc.)")
         logger.info("✅ TT Bar weight: Exact 116.6380g (10 Tola)")
@@ -2645,7 +2665,7 @@ def main():
         
         start_rate_updater()
         
-        logger.info(f"✅ COMPLETE BOT v4.5 READY:")
+        logger.info(f"✅ LIVE BOT v4.5 READY:")
         logger.info(f"  💰 Gold: {format_money(market_data['gold_usd_oz'])} | {format_money_aed(market_data['gold_usd_oz'])}")
         logger.info(f"  📊 Sheets: {'Connected' if sheets_ok else 'Fallback mode'}")
         logger.info(f"  ⚡ All Features: WORKING")
@@ -2653,12 +2673,12 @@ def main():
         logger.info(f"  🔧 Sheet Management: RESTORED")
         logger.info(f"  📏 TT Bar Weight: 116.6380g EXACT")
         logger.info(f"  ⚖️ Purity Display: CLEAR")
-        logger.info(f"  🔄 Rate Updates: Every 5 minutes")
+        logger.info(f"  🔄 LIVE Rate Updates: Every 30 seconds")
         logger.info(f"  🔢 Decimal Quantities: ENABLED")
         logger.info(f"  ☁️ Platform: Railway (24/7 operation)")
         
         logger.info(f"📊 Sheet: https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/edit")
-        logger.info("🚀 STARTING COMPLETE BOT v4.5 FOR 24/7 OPERATION...")
+        logger.info("🚀 STARTING LIVE BOT v4.5 FOR 24/7 OPERATION...")
         logger.info("=" * 60)
         
         # Start bot with cloud-optimized polling
