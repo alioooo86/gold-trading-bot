@@ -139,12 +139,12 @@ GOLD_TYPES = [
 
 # VERIFIED PURITY OPTIONS WITH EXACT CALCULATED MULTIPLIERS
 GOLD_PURITIES = [
-    {"name": "999 (Pure Gold)", "value": 999, "multiplier": 0.118122},
-    {"name": "995 (TT Bar)", "value": 995, "multiplier": 0.117649},
+    {"name": "999 (99.9% Pure Gold)", "value": 999, "multiplier": 0.118122},
+    {"name": "995 (99.5% Pure Gold)", "value": 995, "multiplier": 0.117649},
     {"name": "916 (22K Jewelry)", "value": 916, "multiplier": 0.108308},
     {"name": "875 (21K Jewelry)", "value": 875, "multiplier": 0.103460},
     {"name": "750 (18K Jewelry)", "value": 750, "multiplier": 0.088680},
-    {"name": "990 (99% Pure)", "value": 990, "multiplier": 0.117058},
+    {"name": "990 (99.0% Pure Gold)", "value": 990, "multiplier": 0.117058},
     {"name": "Custom", "value": "custom", "multiplier": 0.118122}
 ]
 
@@ -190,6 +190,32 @@ def format_money_aed(amount_usd):
         return f"AED {amount_aed:,.2f}" if amount_aed >= 0 else f"-AED {abs(amount_aed):,.2f}"
     except Exception:
         return "AED 0.00"
+
+def format_weight_kg(kg):
+    """Format weight in KG with proper commas"""
+    try:
+        kg = safe_float(kg)
+        return f"{kg:,.3f} KG"
+    except Exception:
+        return "0.000 KG"
+
+def format_weight_grams(kg):
+    """Convert KG to grams with proper comma formatting"""
+    try:
+        kg = safe_float(kg)
+        grams = kg * 1000
+        return f"{grams:,.0f} grams"
+    except Exception:
+        return "0 grams"
+
+def format_weight_combined(kg):
+    """Format weight showing both KG and grams"""
+    try:
+        kg = safe_float(kg)
+        grams = kg * 1000
+        return f"{kg:,.3f} KG ({grams:,.0f} grams)"
+    except Exception:
+        return "0.000 KG (0 grams)"
 
 def kg_to_grams(kg):
     """Convert kg to grams"""
@@ -1023,7 +1049,7 @@ Type volume now:""",
         bot.edit_message_text(
             f"""📊 NEW TRADE - STEP 5/8 (CUSTOMER)
 
-✅ Volume: {volume_kg:.3f} KG = {volume_oz:.2f} troy oz
+✅ Volume: {format_weight_combined(volume_kg)} = {volume_oz:.2f} troy oz
 
 👤 SELECT CUSTOMER:""",
             call.message.chat.id,
@@ -1339,8 +1365,8 @@ def show_confirmation(call, trade_session, user_id=None):
 • Operation: {trade_session.operation.upper()}
 • Type: {trade_session.gold_type['name']}
 • Purity: {trade_session.gold_purity['name']}
-• Weight: {trade_session.volume_kg:.3f} KG
-• Pure Gold: {calc_results['pure_gold_kg']:.3f} KG ({calc_results['pure_gold_oz']:.2f} oz)
+• Total Weight: {format_weight_combined(trade_session.volume_kg)}
+• Pure Gold: {format_weight_combined(calc_results['pure_gold_kg'])} ({calc_results['pure_gold_oz']:.2f} troy oz)
 • Customer: {trade_session.customer}
 
 💰 CALCULATION:
@@ -1430,8 +1456,8 @@ def handle_confirm_trade(call):
 
 📋 TRADE SUMMARY:
 • {trade_session.operation.upper()}: {trade_session.gold_type['name']}
-• Weight: {trade_session.volume_kg:.3f} KG
-• Pure Gold: {calc_results['pure_gold_kg']:.3f} KG
+• Total Weight: {format_weight_combined(trade_session.volume_kg)}
+• Pure Gold: {format_weight_combined(calc_results['pure_gold_kg'])}
 • Customer: {trade_session.customer}
 • Dealer: {trade_session.dealer['name']}
 
@@ -2140,7 +2166,7 @@ Ready for professional gold trading!""",
                         
                         bot.send_message(
                             user_id,
-                            f"✅ Volume set: {volume:.3f} KG = {volume_oz:.2f} troy oz\n\n📊 NEW TRADE - STEP 5/8 (CUSTOMER)\n\n👤 SELECT CUSTOMER:",
+                            f"✅ Volume set: {format_weight_combined(volume)} = {volume_oz:.2f} troy oz\n\n📊 NEW TRADE - STEP 5/8 (CUSTOMER)\n\n👤 SELECT CUSTOMER:",
                             reply_markup=markup
                         )
                     else:
