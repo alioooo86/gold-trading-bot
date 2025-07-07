@@ -725,20 +725,27 @@ def add_comment_to_trade(trade_id, commenter_name, comment):
 # ============================================================================
 
 def save_trade_to_sheets(session):
-    """Save trade to Google Sheets with approval status colors"""
+    """Save trade to Google Sheets with approval status colors - ENHANCED LOGGING"""
     try:
+        logger.info(f"🔄 Starting save_trade_to_sheets for {session.session_id}")
+        
         client = get_sheets_client()
         if not client:
+            logger.error("❌ Sheets client failed")
             return False, "Sheets client failed"
             
         spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
+        logger.info(f"✅ Connected to spreadsheet: {GOOGLE_SHEET_ID}")
         
         current_date = get_uae_time()  # Use UAE time
         sheet_name = f"Gold_Trades_{current_date.strftime('%Y_%m')}"
+        logger.info(f"🔄 Target sheet: {sheet_name}")
         
         try:
             worksheet = spreadsheet.worksheet(sheet_name)
+            logger.info(f"✅ Found existing sheet: {sheet_name}")
         except:
+            logger.info(f"🔄 Creating new sheet: {sheet_name}")
             worksheet = spreadsheet.add_worksheet(title=sheet_name, rows=1000, cols=25)
             headers = [
                 'Date', 'Time', 'Dealer', 'Operation', 'Customer', 'Gold Type', 
@@ -748,8 +755,11 @@ def save_trade_to_sheets(session):
                 'Approval Status', 'Approved By', 'Notes'
             ]
             worksheet.append_row(headers)
+            logger.info(f"✅ Created sheet with headers: {sheet_name}")
         
         # Calculate using appropriate method based on rate type
+        logger.info(f"🔄 Calculating trade totals for rate type: {session.rate_type}")
+        
         if session.rate_type == "override":
             calc_results = calculate_trade_totals_with_override(
                 session.volume_kg,
@@ -778,6 +788,8 @@ def save_trade_to_sheets(session):
             rate_description = f"{session.rate_type.upper()}: ${base_rate_usd:,.2f} {pd_sign} ${session.pd_amount}/oz"
             pd_amount_display = f"{pd_sign}${session.pd_amount:.2f}"
         
+        logger.info(f"✅ Trade calculations completed")
+        
         base_rate_aed = base_rate_usd * USD_TO_AED_RATE
         
         # Use calculated values
@@ -795,9 +807,11 @@ def save_trade_to_sheets(session):
             gold_type_desc += f" (qty: {session.quantity})"
         
         # Get approval info
-        approval_status = getattr(session, 'approval_status', 'final_approved')
+        approval_status = getattr(session, 'approval_status', 'pending')
         approved_by = getattr(session, 'approved_by', [])
         comments = getattr(session, 'comments', [])
+        
+        logger.info(f"🔄 Approval status: {approval_status}")
         
         # Build notes with comments
         notes_parts = [f"v4.7 UAE: {rate_description}"]
@@ -830,15 +844,19 @@ def save_trade_to_sheets(session):
             pd_amount_display,
             session.session_id,
             approval_status.upper(),
-            ", ".join(approved_by) if approved_by else "System",
+            ", ".join(approved_by) if approved_by else "Pending",
             notes_text
         ]
+        
+        logger.info(f"🔄 Appending row data to sheet...")
         
         # Add row and get its position for coloring
         worksheet.append_row(row_data)
         row_count = len(worksheet.get_all_values())
         
-        # Apply color coding based on approval status
+        logger.info(f"✅ Row added at position: {row_count}")
+        
+        # Apply color coding to SPECIFIC COLUMNS ONLY (not entire row)
         try:
             if approval_status == "pending":
                 # Red background for pending
@@ -859,13 +877,16 @@ def save_trade_to_sheets(session):
                 # Default white
                 color_format = {"backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}}
             
-            worksheet.format(f"{row_count}:{row_count}", color_format)
-            logger.info(f"✅ Applied {approval_status} color formatting to row {row_count}")
+            # Apply color to SPECIFIC COLUMNS ONLY (Approval Status, Approved By, Notes)
+            # Columns W, X, Y (23, 24, 25) are the approval-related columns
+            logger.info(f"🔄 Applying color formatting to columns W{row_count}:Y{row_count}")
+            worksheet.format(f"W{row_count}:Y{row_count}", color_format)
+            logger.info(f"✅ Applied {approval_status} color formatting to approval columns only")
             
         except Exception as e:
             logger.warning(f"⚠️ Color formatting failed: {e}")
         
-        logger.info(f"✅ Trade saved to sheets: {session.session_id}")
+        logger.info(f"✅ Trade saved to sheets successfully: {session.session_id}")
         return True, session.session_id
         
     except Exception as e:
