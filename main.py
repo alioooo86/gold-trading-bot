@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-🥇 GOLD TRADING BOT v4.4 - TT BAR WEIGHT & PURITY DISPLAY FIXED
+🥇 GOLD TRADING BOT v4.5 - RATE UPDATES & DECIMAL QUANTITIES
+✨ FIXED: Market rate updates every 5 minutes (was 15 min)
+✨ FIXED: Manual force refresh rate option added
+✨ FIXED: Decimal quantities allowed (0.25, 2.5, etc.)
 ✨ FIXED: TT Bar weight corrected to exact 116.6380 grams (10 Tola)
 ✨ FIXED: Purity calculations clearly displayed in confirmations
-✨ FIXED: Pure gold amounts show purity factor applied
-✨ FIXED: Complete sheet management functions restored
-✨ FIXED: Weight display in both KG and grams in sheets
 🎨 Stunning gold-themed sheets with business-grade presentation
 🚀 Ready to run on Railway with automatic restarts!
 """
@@ -381,7 +381,7 @@ def fetch_gold_rate():
     return False
 
 def start_rate_updater():
-    """Start background rate updater for cloud deployment"""
+    """Start background rate updater for cloud deployment - FASTER UPDATES"""
     def update_loop():
         while True:
             try:
@@ -390,14 +390,14 @@ def start_rate_updater():
                     logger.info(f"🔄 Rate updated: ${market_data['gold_usd_oz']:.2f}")
                 else:
                     logger.warning("⚠️ Rate update failed, using cached value")
-                time.sleep(900)  # 15 minutes
+                time.sleep(300)  # 5 minutes instead of 15 minutes
             except Exception as e:
                 logger.error(f"❌ Rate updater error: {e}")
-                time.sleep(600)  # 10 minutes on error
+                time.sleep(180)  # 3 minutes on error instead of 10
     
     thread = threading.Thread(target=update_loop, daemon=True)
     thread.start()
-    logger.info("✅ Background rate updater started for 24/7 operation")
+    logger.info("✅ Background rate updater started - Updates every 5 minutes")
 
 def get_sheets_client():
     """Get authenticated Google Sheets client with cloud-safe error handling"""
@@ -573,7 +573,7 @@ def save_trade_to_sheets(session):
             session.rate_type.upper(),
             pd_amount_display,
             session.session_id,
-            f"v4.4 Complete: {rate_description}"
+            f"v4.5 Complete: {rate_description}"
         ]
         
         worksheet.append_row(row_data)
@@ -615,7 +615,7 @@ def start_command(message):
         
         markup.add(types.InlineKeyboardButton("💰 Live Gold Rate", callback_data="show_rate"))
         
-        welcome_text = f"""🥇 GOLD TRADING BOT v4.4 - TT BAR & PURITY FIXED! ✨
+        welcome_text = f"""🥇 GOLD TRADING BOT v4.5 - RATE UPDATES & DECIMALS! ✨
 🚀 Complete Trading System + Sheet Integration
 
 📊 SYSTEM STATUS:
@@ -624,17 +624,17 @@ def start_command(message):
 📈 Trend: {market_data['trend'].title()}
 ☁️ Cloud: Railway Platform (Always On)
 
-🔧 FIXES IN v4.4:
+🔧 NEW IN v4.5:
+✅ Rate updates every 5 minutes (faster!)
+✅ Manual force refresh rate option
+✅ Decimal quantities: 0.25, 2.5, etc.
 ✅ TT Bar weight: Exact 116.6380g (10 Tola)
 ✅ Purity calculations clearly displayed
-✅ Pure gold amounts show purity factor
-✅ Sheet management functions restored
-✅ Weight display in KG + grams in sheets
 
 🔒 SELECT DEALER TO LOGIN:"""
         
         bot.send_message(message.chat.id, welcome_text, reply_markup=markup)
-        logger.info(f"👤 User {user_id} started FIXED cloud bot v4.4")
+        logger.info(f"👤 User {user_id} started COMPLETE cloud bot v4.5")
         
     except Exception as e:
         logger.error(f"❌ Start error: {e}")
@@ -656,6 +656,8 @@ def handle_callbacks(call):
             handle_login(call)
         elif data == 'show_rate':
             handle_show_rate(call)
+        elif data == 'force_refresh_rate':
+            handle_force_refresh_rate(call)
         elif data == 'dashboard':
             handle_dashboard(call)
         elif data == 'new_trade':
@@ -760,18 +762,63 @@ Type the PIN now:""",
     except Exception as e:
         logger.error(f"Login error: {e}")
 
-def handle_show_rate(call):
-    """Show gold rate - FIXED MESSAGE LENGTH"""
+def handle_force_refresh_rate(call):
+    """Force refresh gold rate manually"""
     try:
-        trend_emoji = {"up": "⬆️", "down": "⬇️", "stable": "➡️"}
-        emoji = trend_emoji.get(market_data['trend'], "➡️")
+        bot.edit_message_text("🔄 Fetching latest gold rate...", call.message.chat.id, call.message.message_id)
         
-        rate_text = f"""💰 LIVE GOLD RATE
+        success = fetch_gold_rate()
+        
+        if success:
+            trend_emoji = {"up": "⬆️", "down": "⬇️", "stable": "➡️"}
+            emoji = trend_emoji.get(market_data['trend'], "➡️")
+            
+            rate_text = f"""💰 GOLD RATE - FORCE REFRESHED! ✨
 
 🥇 Current: {format_money(market_data['gold_usd_oz'])} USD/oz
 💱 AED: {format_money_aed(market_data['gold_usd_oz'])}/oz
 {emoji} Trend: {market_data['trend'].title()}
-⏰ Updated: {market_data['last_update']}
+⏰ Just Updated: {market_data['last_update']}
+🔄 Change: {market_data['change_24h']:+.2f} USD
+
+📏 Quick Conversions (999 Purity):
+• 1 KG: {format_money(market_data['gold_usd_oz'] * kg_to_oz(1) * 0.999)}
+• 1 TT Bar: {format_money(market_data['gold_usd_oz'] * grams_to_oz(116.6380) * 0.999)}
+
+✅ Rate successfully refreshed!"""
+        else:
+            rate_text = f"""❌ REFRESH FAILED
+
+🥇 Current (Cached): {format_money(market_data['gold_usd_oz'])} USD/oz
+💱 AED: {format_money_aed(market_data['gold_usd_oz'])}/oz
+⏰ Last Update: {market_data['last_update']}
+
+⚠️ Unable to fetch new rate. Using cached value.
+🔄 Auto-updates continue every 5 minutes."""
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔄 Try Again", callback_data="force_refresh_rate"))
+        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
+        
+        bot.edit_message_text(rate_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    except Exception as e:
+        logger.error(f"Force refresh error: {e}")
+
+def handle_show_rate(call):
+    """Show gold rate - WITH MANUAL REFRESH"""
+    try:
+        # REFRESH RATE ON EACH VIEW
+        fetch_gold_rate()
+        
+        trend_emoji = {"up": "⬆️", "down": "⬇️", "stable": "➡️"}
+        emoji = trend_emoji.get(market_data['trend'], "➡️")
+        
+        rate_text = f"""💰 LIVE GOLD RATE - AUTO-REFRESHED
+
+🥇 Current: {format_money(market_data['gold_usd_oz'])} USD/oz
+💱 AED: {format_money_aed(market_data['gold_usd_oz'])}/oz
+{emoji} Trend: {market_data['trend'].title()}
+⏰ Updated: {market_data['last_update']} (Auto: Every 5min)
 
 📏 Quick Conversions (999 Purity):
 • 1 KG (32.15 oz): {format_money(market_data['gold_usd_oz'] * kg_to_oz(1) * 0.999)}
@@ -784,7 +831,7 @@ def handle_show_rate(call):
 ☁️ Running 24/7 on Railway Cloud!"""
         
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="show_rate"))
+        markup.add(types.InlineKeyboardButton("🔄 Force Refresh", callback_data="show_rate"))
         markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="start"))
         
         bot.edit_message_text(rate_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
@@ -807,6 +854,7 @@ def handle_dashboard(call):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
         markup.add(types.InlineKeyboardButton("💰 Live Rate", callback_data="show_rate"))
+        markup.add(types.InlineKeyboardButton("🔄 Refresh Rate", callback_data="force_refresh_rate"))
         
         # Add sheet management for admin users
         if 'admin' in permissions:
@@ -815,24 +863,23 @@ def handle_dashboard(call):
         markup.add(types.InlineKeyboardButton("🔧 System Status", callback_data="system_status"))
         markup.add(types.InlineKeyboardButton("🔙 Logout", callback_data="start"))
         
-        dashboard_text = f"""✅ DEALER DASHBOARD v4.4 - TT BAR & PURITY FIXED! ✨
+        dashboard_text = f"""✅ DEALER DASHBOARD v4.5 - FASTER RATE UPDATES! ✨
 
 👤 Welcome {dealer['name'].upper()}!
 🔒 Level: {dealer['level'].title()}
 🎯 Permissions: {', '.join(permissions).upper()}
 
-💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
+💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz (Updates every 5min)
 
 🎯 COMPLETE TRADING SYSTEM:
 ✅ All Gold Types (Kilo, TT=116.64g, 100g, Tola=11.66g, Custom)
 ✅ All Purities (999, 995, 916, 875, 750, 990)
 ✅ Rate Options (Market, Custom, Override)
+✅ DECIMAL Quantities (0.25, 2.5, etc.)
 ✅ Professional Sheet Integration
 ✅ Beautiful Gold-Themed Formatting
-✅ FIXED: Exact TT bar weight (116.6380g)
-✅ FIXED: Purity calculations clearly displayed
-✅ FIXED: Sheet management functions
-✅ FIXED: Weight display (KG + grams){chr(10) + '✅ Sheet Management (Admin Access)' if 'admin' in permissions else ''}
+✅ FASTER rate updates (5min vs 15min)
+✅ Manual force refresh option{chr(10) + '✅ Sheet Management (Admin Access)' if 'admin' in permissions else ''}
 
 👆 SELECT ACTION:"""
         
@@ -877,7 +924,7 @@ def handle_new_trade(call):
             reply_markup=markup
         )
         
-        logger.info(f"📊 User {user_id} started FIXED trade v4.4")
+        logger.info(f"📊 User {user_id} started COMPLETE trade v4.5")
     except Exception as e:
         logger.error(f"New trade error: {e}")
 
@@ -1029,10 +1076,10 @@ def handle_quantity(call):
                 f"""🔢 CUSTOM QUANTITY
 
 💬 How many {trade_session.gold_type['name']}s?
-📝 Example: 25
+📝 Examples: 25, 2.5, 0.25
 
 ⚖️ Each {trade_session.gold_type['name']} = {trade_session.gold_type['weight_grams']:,.1f} grams
-⚠️ Range: 1 - 10000 pieces
+⚠️ Range: 0.01 - 10000 pieces (decimals allowed)
 
 Type quantity now:""",
                 call.message.chat.id,
@@ -1042,12 +1089,12 @@ Type quantity now:""",
             return
         
         try:
-            quantity = int(quantity_data)
+            quantity = float(quantity_data)  # FIXED: Allow decimal quantities
         except:
             bot.edit_message_text("❌ Invalid quantity", call.message.chat.id, call.message.message_id)
             return
         
-        # Calculate total weight based on quantity
+        # Calculate total weight based on quantity - SUPPORTS DECIMALS
         weight_per_piece_grams = trade_session.gold_type['weight_grams']
         total_weight_grams = quantity * weight_per_piece_grams
         total_weight_kg = total_weight_grams / 1000
@@ -1065,11 +1112,14 @@ Type quantity now:""",
             ))
         markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
         
+        # Format quantity display properly for decimals
+        qty_display = f"{quantity:g}" if quantity == int(quantity) else f"{quantity:.3f}".rstrip('0').rstrip('.')
+        
         bot.edit_message_text(
             f"""📊 NEW TRADE - STEP 4/8 (PURITY)
 
 ✅ Operation: {trade_session.operation.upper()}
-✅ Type: {quantity} × {trade_session.gold_type['name']}
+✅ Type: {qty_display} × {trade_session.gold_type['name']}
 ✅ Total Weight: {format_weight_combined(total_weight_kg)}
 
 ⚖️ SELECT PURITY:""",
@@ -1723,7 +1773,7 @@ def handle_system_status(call):
         sheets_success, sheets_message = test_sheets_connection()
         total_sessions = len(user_sessions)
         
-        status_text = f"""🔧 SYSTEM STATUS v4.4 - TT BAR & PURITY FIXED! ✅
+        status_text = f"""🔧 SYSTEM STATUS v4.5 - FASTER RATE UPDATES! ✅
 
 📊 CORE SYSTEMS:
 • Bot Status: ✅ ONLINE (Railway Cloud)
@@ -1735,6 +1785,7 @@ def handle_system_status(call):
 • AED Rate: {format_money_aed(market_data['gold_usd_oz'])}/oz
 • Trend: {market_data['trend'].title()}
 • Last Update: {market_data['last_update']}
+• Update Frequency: Every 5 minutes ⚡
 
 📊 CONNECTIVITY:
 • Google Sheets: {'✅ Connected' if sheets_success else '❌ Failed'}
@@ -1753,12 +1804,12 @@ def handle_system_status(call):
 ✅ All Handlers Complete
 ✅ Sheet Management Tools
 
-🔧 v4.4 FIXES:
+🆕 v4.5 NEW FEATURES:
+✅ Rate updates every 5 minutes (3x faster!)
+✅ Manual force refresh rate option
+✅ Decimal quantities (0.25, 2.5, etc.)
 ✅ TT Bar weight: Exact 116.6380g (10 Tola)
-✅ Purity calculations clearly displayed
-✅ Pure gold amounts show purity factor
-✅ Sheet management functions restored
-✅ Weight display in KG + grams in sheets"""
+✅ Purity calculations clearly displayed"""
         
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="system_status"))
@@ -2360,14 +2411,15 @@ def handle_text(message):
                     user_id, 
                     f"""✅ Welcome {dealer['name']}! 
 
-🥇 Gold Trading Bot v4.4 - COMPLETE
+🥇 Gold Trading Bot v4.5 - COMPLETE
 🚀 All trading features + Sheet integration
 💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
+⚡ Updates every 5 minutes + manual refresh
 
 Ready for professional gold trading!""", 
                     reply_markup=markup
                 )
-                logger.info(f"✅ Login: {dealer['name']} (COMPLETE Cloud)")
+                logger.info(f"✅ Login: {dealer['name']} (COMPLETE Cloud v4.5)")
             else:
                 bot.send_message(user_id, "❌ Wrong PIN. Please try again.")
         
@@ -2379,11 +2431,11 @@ Ready for professional gold trading!""",
                 input_type = session_data["awaiting_input"]
                 trade_session = session_data.get("trade_session")
                 
-                # FIXED: Handle quantity input
+                # FIXED: Handle quantity input - SUPPORTS DECIMALS
                 if input_type == "quantity" and trade_session:
                     try:
-                        quantity = int(text)
-                        if 1 <= quantity <= 10000:
+                        quantity = float(text)  # CHANGED: Allow decimal quantities
+                        if 0.01 <= quantity <= 10000:  # CHANGED: Allow small decimals
                             # Calculate total weight based on quantity
                             weight_per_piece_grams = trade_session.gold_type['weight_grams']
                             total_weight_grams = quantity * weight_per_piece_grams
@@ -2402,9 +2454,12 @@ Ready for professional gold trading!""",
                                 ))
                             markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
                             
+                            # Format quantity display properly for decimals
+                            qty_display = f"{quantity:g}" if quantity == int(quantity) else f"{quantity:.3f}".rstrip('0').rstrip('.')
+                            
                             bot.send_message(
                                 user_id,
-                                f"""✅ Quantity set: {quantity} × {trade_session.gold_type['name']}
+                                f"""✅ Quantity set: {qty_display} × {trade_session.gold_type['name']}
 ✅ Total Weight: {format_weight_combined(total_weight_kg)}
 
 📊 NEW TRADE - STEP 4/8 (PURITY)
@@ -2413,9 +2468,9 @@ Ready for professional gold trading!""",
                                 reply_markup=markup
                             )
                         else:
-                            bot.send_message(user_id, "❌ Quantity must be 1-10000 pieces")
+                            bot.send_message(user_id, "❌ Quantity must be 0.01-10000 pieces")
                     except ValueError:
-                        bot.send_message(user_id, "❌ Invalid quantity. Please enter a number.")
+                        bot.send_message(user_id, "❌ Invalid quantity. Enter number like: 2.5")
                 
                 elif input_type == "volume" and trade_session:
                     volume = safe_float(text)
@@ -2564,14 +2619,14 @@ def main():
     """Main function optimized for Railway cloud deployment"""
     try:
         logger.info("=" * 60)
-        logger.info("🥇 GOLD TRADING BOT v4.4 - TT BAR WEIGHT & PURITY DISPLAY FIXED!")
+        logger.info("🥇 GOLD TRADING BOT v4.5 - RATE UPDATES & DECIMAL QUANTITIES!")
         logger.info("=" * 60)
-        logger.info("🎯 FIXED FEATURES:")
+        logger.info("🆕 NEW FEATURES:")
+        logger.info("✅ Rate updates every 5 minutes (3x faster!)")
+        logger.info("✅ Manual force refresh rate option")
+        logger.info("✅ Decimal quantities (0.25, 2.5, etc.)")
         logger.info("✅ TT Bar weight: Exact 116.6380g (10 Tola)")
         logger.info("✅ Purity calculations clearly displayed")
-        logger.info("✅ Pure gold amounts show purity factor")
-        logger.info("✅ Sheet management functions restored")
-        logger.info("✅ Weight display in KG + grams in sheets")
         logger.info("✅ All Trading Steps (8-step process)")
         logger.info("✅ Professional Sheet Integration")
         logger.info("✅ Rate Override Functionality")
@@ -2590,7 +2645,7 @@ def main():
         
         start_rate_updater()
         
-        logger.info(f"✅ COMPLETE BOT v4.4 READY:")
+        logger.info(f"✅ COMPLETE BOT v4.5 READY:")
         logger.info(f"  💰 Gold: {format_money(market_data['gold_usd_oz'])} | {format_money_aed(market_data['gold_usd_oz'])}")
         logger.info(f"  📊 Sheets: {'Connected' if sheets_ok else 'Fallback mode'}")
         logger.info(f"  ⚡ All Features: WORKING")
@@ -2598,16 +2653,18 @@ def main():
         logger.info(f"  🔧 Sheet Management: RESTORED")
         logger.info(f"  📏 TT Bar Weight: 116.6380g EXACT")
         logger.info(f"  ⚖️ Purity Display: CLEAR")
+        logger.info(f"  🔄 Rate Updates: Every 5 minutes")
+        logger.info(f"  🔢 Decimal Quantities: ENABLED")
         logger.info(f"  ☁️ Platform: Railway (24/7 operation)")
         
         logger.info(f"📊 Sheet: https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/edit")
-        logger.info("🚀 STARTING COMPLETE BOT v4.4 FOR 24/7 OPERATION...")
+        logger.info("🚀 STARTING COMPLETE BOT v4.5 FOR 24/7 OPERATION...")
         logger.info("=" * 60)
         
         # Start bot with cloud-optimized polling
         while True:
             try:
-                logger.info("🚀 Starting COMPLETE bot polling on Railway cloud...")
+                logger.info("🚀 Starting COMPLETE bot v4.5 polling on Railway cloud...")
                 bot.infinity_polling(
                     timeout=30, 
                     long_polling_timeout=30,
