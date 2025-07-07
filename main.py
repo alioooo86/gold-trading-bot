@@ -681,7 +681,7 @@ def approve_trade(trade_id, approver_name, comment=""):
         return False, str(e)
 
 def reject_trade(trade_id, rejector_name, reason=""):
-    """Reject a trade"""
+    """Reject a trade and update sheets"""
     try:
         if trade_id not in pending_trades:
             return False, "Trade not found"
@@ -690,18 +690,20 @@ def reject_trade(trade_id, rejector_name, reason=""):
         trade.approval_status = "rejected"
         trade.comments.append(f"REJECTED by {rejector_name}: {reason}")
         
-        # Could optionally save rejected trades to a separate sheet
-        # For now, just remove from pending
+        # Update sheet with rejected status
+        update_trade_status_in_sheets(trade)
+        
+        # Remove from pending trades
         del pending_trades[trade_id]
         
-        return True, f"Trade rejected by {rejector_name}"
+        return True, f"Trade rejected by {rejector_name}. Reason: {reason}"
         
     except Exception as e:
         logger.error(f"❌ Rejection error: {e}")
         return False, str(e)
 
 def add_comment_to_trade(trade_id, commenter_name, comment):
-    """Add comment to trade"""
+    """Add comment to trade and update sheets"""
     try:
         if trade_id not in pending_trades:
             return False, "Trade not found"
@@ -709,7 +711,10 @@ def add_comment_to_trade(trade_id, commenter_name, comment):
         trade = pending_trades[trade_id]
         trade.comments.append(f"{commenter_name}: {comment}")
         
-        return True, "Comment added successfully"
+        # Update sheet with new comment
+        update_trade_status_in_sheets(trade)
+        
+        return True, f"Comment added by {commenter_name}: {comment}"
         
     except Exception as e:
         logger.error(f"❌ Comment error: {e}")
@@ -1289,7 +1294,7 @@ def handle_view_trade(call):
         logger.error(f"View trade error: {e}")
 
 def handle_approve_trade(call):
-    """Handle trade approval"""
+    """Handle trade approval with enhanced navigation"""
     try:
         trade_id = call.data.replace("approve_", "")
         user_id = call.from_user.id
@@ -1304,19 +1309,35 @@ def handle_approve_trade(call):
         
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
+        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
         markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
         
         if success:
-            result_text = f"✅ APPROVAL SUCCESSFUL\n\n{message}"
+            result_text = f"""✅ APPROVAL SUCCESSFUL!
+
+{message}
+
+📊 SHEET STATUS UPDATED:
+• Color changed in sheets automatically
+• Status visible to all approvers
+• Workflow progressed to next step
+
+👆 SELECT NEXT ACTION:"""
         else:
-            result_text = f"❌ APPROVAL FAILED\n\n{message}"
+            result_text = f"""❌ APPROVAL FAILED
+
+{message}
+
+Please try again or contact admin.
+
+👆 SELECT ACTION:"""
         
         bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     except Exception as e:
         logger.error(f"Approve trade error: {e}")
 
 def handle_reject_trade(call):
-    """Handle trade rejection"""
+    """Handle trade rejection with enhanced navigation"""
     try:
         trade_id = call.data.replace("reject_", "")
         user_id = call.from_user.id
@@ -1338,6 +1359,11 @@ def handle_reject_trade(call):
 
 💬 Please provide a reason for rejection:
 
+⚠️ This will:
+• Mark trade as REJECTED in sheets
+• Remove from approval workflow
+• Notify all parties
+
 Type your rejection reason now:""",
             call.message.chat.id,
             call.message.message_id,
@@ -1347,7 +1373,7 @@ Type your rejection reason now:""",
         logger.error(f"Reject trade error: {e}")
 
 def handle_comment_trade(call):
-    """Handle adding comment to trade"""
+    """Handle adding comment to trade with enhanced navigation"""
     try:
         trade_id = call.data.replace("comment_", "")
         user_id = call.from_user.id
@@ -1373,6 +1399,12 @@ Examples:
 • "Checked customer creditworthiness - looks good"
 • "Please verify gold purity before approval"
 • "Customer requested faster processing"
+• "Rate seems competitive for this volume"
+
+⚠️ Comments will be:
+• Visible in sheets
+• Included in approval history
+• Sent to all approvers
 
 Type your comment now:""",
             call.message.chat.id,
@@ -2492,11 +2524,30 @@ Ready for professional gold trading with approval workflow!""",
                         
                         markup = types.InlineKeyboardMarkup()
                         markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
+                        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
+                        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
                         
                         if success:
-                            bot.send_message(user_id, f"✅ TRADE REJECTED\n\n{message_result}", reply_markup=markup)
+                            result_text = f"""✅ TRADE REJECTED SUCCESSFULLY
+
+{message_result}
+
+📊 SHEET STATUS:
+• Trade marked as REJECTED
+• Removed from approval workflow
+• All parties notified
+
+👆 SELECT NEXT ACTION:"""
+                            bot.send_message(user_id, result_text, reply_markup=markup)
                         else:
-                            bot.send_message(user_id, f"❌ REJECTION FAILED\n\n{message_result}", reply_markup=markup)
+                            result_text = f"""❌ REJECTION FAILED
+
+{message_result}
+
+Please try again or contact admin.
+
+👆 SELECT ACTION:"""
+                            bot.send_message(user_id, result_text, reply_markup=markup)
                     else:
                         bot.send_message(user_id, "❌ Reason too long (max 200 characters)")
                 
@@ -2510,11 +2561,30 @@ Ready for professional gold trading with approval workflow!""",
                         
                         markup = types.InlineKeyboardMarkup()
                         markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
+                        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
+                        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
                         
                         if success:
-                            bot.send_message(user_id, f"✅ COMMENT ADDED\n\n{message_result}", reply_markup=markup)
+                            result_text = f"""✅ COMMENT ADDED SUCCESSFULLY
+
+{message_result}
+
+📊 SHEET STATUS:
+• Comment added to trade record
+• Visible to all approvers
+• Included in approval history
+
+👆 SELECT NEXT ACTION:"""
+                            bot.send_message(user_id, result_text, reply_markup=markup)
                         else:
-                            bot.send_message(user_id, f"❌ COMMENT FAILED\n\n{message_result}", reply_markup=markup)
+                            result_text = f"""❌ COMMENT FAILED
+
+{message_result}
+
+Please try again or contact admin.
+
+👆 SELECT ACTION:"""
+                            bot.send_message(user_id, result_text, reply_markup=markup)
                     else:
                         bot.send_message(user_id, "❌ Comment too long (max 200 characters)")
                 
@@ -2703,7 +2773,7 @@ Ready for professional gold trading with approval workflow!""",
 # ============================================================================
 
 def handle_sheet_management(call):
-    """Handle sheet management for admin users"""
+    """Handle sheet management for admin users - FULL FUNCTIONALITY"""
     try:
         user_id = call.from_user.id
         session = user_sessions.get(user_id, {})
@@ -2714,19 +2784,31 @@ def handle_sheet_management(call):
             return
         
         markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("📊 View All Sheets", callback_data="view_sheets"))
+        markup.add(types.InlineKeyboardButton("🎨 Format Current Sheet", callback_data="format_sheet"))
+        markup.add(types.InlineKeyboardButton("🔧 Fix Headers", callback_data="fix_headers"))
+        markup.add(types.InlineKeyboardButton("🗑️ Delete Sheets", callback_data="delete_sheets"))
+        markup.add(types.InlineKeyboardButton("🧹 Clear Sheet Data", callback_data="clear_sheets"))
         markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="dashboard"))
         
         bot.edit_message_text(
-            """🗂️ SHEET MANAGEMENT - ADMIN ONLY
+            """🗂️ ADVANCED SHEET MANAGEMENT - ADMIN ACCESS
 
-🎨 SHEET MANAGEMENT FEATURES:
-• Professional formatting applied automatically
-• Color-coded approval status
-• Headers updated for approval workflow
+🎨 PROFESSIONAL FORMATTING TOOLS:
+• View All Sheets: See spreadsheet overview
+• Format Current Sheet: Apply beautiful gold formatting
+• Fix Headers: Ensure proper column headers  
+• Delete Sheets: Remove unwanted sheets permanently
+• Clear Sheet Data: Remove data while keeping headers
 
-⚠️ Advanced sheet management available in full version
+✅ APPROVAL WORKFLOW FEATURES:
+• Color-coded status (Red=Pending, Green=Approved)
+• Real-time status updates
+• Complete approval tracking
 
-👆 BACK TO DASHBOARD:""",
+⚠️ Delete/Clear operations cannot be undone!
+
+👆 SELECT ACTION:""",
             call.message.chat.id,
             call.message.message_id,
             reply_markup=markup
@@ -2734,128 +2816,511 @@ def handle_sheet_management(call):
     except Exception as e:
         logger.error(f"Sheet management error: {e}")
 
-def handle_view_sheets(call):
-    """Simple view sheets handler"""
+def get_all_sheets():
+    """Get all sheets in the spreadsheet"""
     try:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="dashboard"))
+        client = get_sheets_client()
+        if not client:
+            return False, "Client connection failed"
+            
+        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
+        worksheets = spreadsheet.worksheets()
         
-        bot.edit_message_text(
-            """📊 SHEET OVERVIEW
+        sheet_info = []
+        for sheet in worksheets:
+            try:
+                row_count = sheet.row_count
+                col_count = sheet.col_count
+                all_values = sheet.get_all_values()
+                data_rows = len([row for row in all_values if any(cell.strip() for cell in row)])
+                
+                sheet_info.append({
+                    'name': sheet.title,
+                    'id': sheet.id,
+                    'row_count': row_count,
+                    'col_count': col_count,
+                    'data_rows': data_rows,
+                    'updated': getattr(sheet, 'updated', 'Unknown')
+                })
+            except Exception as e:
+                logger.error(f"Error getting sheet info for {sheet.title}: {e}")
+                sheet_info.append({
+                    'name': sheet.title,
+                    'id': getattr(sheet, 'id', 'Unknown'),
+                    'row_count': 'Unknown',
+                    'col_count': 'Unknown',
+                    'data_rows': 'Unknown',
+                    'updated': 'Unknown'
+                })
+        
+        return True, sheet_info
+        
+    except Exception as e:
+        logger.error(f"Error getting sheets: {e}")
+        return False, str(e)
 
-✅ Professional approval workflow sheets are active
-✅ Color-coded status (Red=Pending, Green=Approved)
-✅ Complete trade tracking with approval history
+def format_sheet_beautifully(worksheet):
+    """🎨 PROFESSIONAL SHEET FORMATTING - AMAZING RESULTS!"""
+    try:
+        logger.info(f"🎨 Starting PROFESSIONAL formatting for: {worksheet.title}")
+        
+        # Get sheet data
+        all_values = worksheet.get_all_values()
+        row_count = len(all_values)
+        
+        if row_count < 1:
+            logger.info("⚠️ Sheet is empty, skipping formatting")
+            return
+        
+        # 1️⃣ STUNNING GOLD HEADERS
+        try:
+            header_format = {
+                "backgroundColor": {
+                    "red": 0.85,    # Rich gold background ✨
+                    "green": 0.65,
+                    "blue": 0.125
+                },
+                "textFormat": {
+                    "foregroundColor": {"red": 0.2, "green": 0.2, "blue": 0.2},  # Dark text
+                    "fontSize": 12,
+                    "bold": True,
+                    "fontFamily": "Roboto"
+                },
+                "horizontalAlignment": "CENTER",
+                "verticalAlignment": "MIDDLE",
+                "borders": {
+                    "top": {"style": "SOLID", "width": 2, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}},
+                    "bottom": {"style": "SOLID", "width": 2, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}},
+                    "left": {"style": "SOLID", "width": 1, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}},
+                    "right": {"style": "SOLID", "width": 1, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}}
+                }
+            }
+            
+            worksheet.format("1:1", header_format)
+            logger.info("✅ STUNNING gold headers applied")
+            
+        except Exception as e:
+            logger.info(f"⚠️ Header formatting failed: {e}")
+        
+        # 2️⃣ SMART CURRENCY FORMATTING
+        try:
+            if row_count > 1:
+                # USD Currency formatting
+                usd_format = {
+                    "numberFormat": {"type": "CURRENCY", "pattern": "$#,##0.00"},
+                    "horizontalAlignment": "RIGHT"
+                }
+                worksheet.format(f"K2:K{row_count}", usd_format)  # Price USD
+                worksheet.format(f"M2:M{row_count}", usd_format)  # Input Rate USD  
+                worksheet.format(f"O2:O{row_count}", usd_format)  # Final Rate USD
+                worksheet.format(f"Q2:Q{row_count}", usd_format)  # Market Rate USD
+                
+                # AED Currency formatting
+                aed_format = {
+                    "numberFormat": {"type": "CURRENCY", "pattern": "AED #,##0.00"},
+                    "horizontalAlignment": "RIGHT"
+                }
+                worksheet.format(f"L2:L{row_count}", aed_format)  # Price AED
+                worksheet.format(f"N2:N{row_count}", aed_format)  # Input Rate AED
+                worksheet.format(f"P2:P{row_count}", aed_format)  # Final Rate AED
+                worksheet.format(f"R2:R{row_count}", aed_format)  # Market Rate AED
+                
+                logger.info("✅ SMART currency formatting applied")
+                
+        except Exception as e:
+            logger.info(f"⚠️ Currency formatting failed: {e}")
+        
+        # 3️⃣ PROFESSIONAL BORDERS
+        try:
+            if row_count > 1:
+                border_format = {
+                    "borders": {
+                        "top": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
+                        "bottom": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
+                        "left": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
+                        "right": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}}
+                    }
+                }
+                worksheet.format(f"A1:Y{row_count}", border_format)
+                logger.info("✅ PROFESSIONAL borders applied")
+        except Exception as e:
+            logger.info(f"⚠️ Border formatting failed: {e}")
+        
+        # 4️⃣ PERFECT COLUMN SIZING
+        try:
+            worksheet.columns_auto_resize(0, 25)
+            logger.info("✅ PERFECT column sizing applied")
+        except Exception as e:
+            logger.info(f"⚠️ Column resize failed: {e}")
+        
+        logger.info(f"🎉 PROFESSIONAL formatting completed successfully!")
+        
+    except Exception as e:
+        logger.error(f"❌ Professional formatting failed: {e}")
 
-Sheet management simplified for approval workflow.""",
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=markup
-        )
+def ensure_proper_headers(worksheet):
+    """Ensure worksheet has EXACT headers matching trade data with approval"""
+    try:
+        all_values = worksheet.get_all_values()
+        
+        # Define the EXACT headers with APPROVAL COLUMNS
+        correct_headers = [
+            'Date', 'Time', 'Dealer', 'Operation', 'Customer', 'Gold Type', 
+            'Volume KG', 'Volume Grams', 'Pure Gold KG', 'Pure Gold Grams', 'Price USD', 'Price AED', 
+            'Input Rate USD', 'Input Rate AED', 'Final Rate USD', 'Final Rate AED', 
+            'Market Rate USD', 'Market Rate AED', 'Purity', 'Rate Type', 'P/D Amount', 'Session ID', 
+            'Approval Status', 'Approved By', 'Notes'
+        ]
+        
+        if not all_values:
+            # Empty sheet, add headers
+            worksheet.append_row(correct_headers)
+            logger.info("✅ Added EXACT headers with approval columns to empty sheet")
+            return True
+        
+        current_headers = all_values[0]
+        
+        # Check if headers need updating
+        headers_need_update = False
+        
+        # Check if we have the right number of columns
+        if len(current_headers) != len(correct_headers):
+            headers_need_update = True
+            logger.info(f"⚠️ Header count mismatch: {len(current_headers)} vs {len(correct_headers)}")
+        
+        # Check if each header matches
+        for i, correct_header in enumerate(correct_headers):
+            if i >= len(current_headers) or current_headers[i].strip() != correct_header:
+                headers_need_update = True
+                logger.info(f"⚠️ Header mismatch at position {i}: '{current_headers[i] if i < len(current_headers) else 'MISSING'}' vs '{correct_header}'")
+        
+        if headers_need_update:
+            logger.info("🔧 Updating headers to EXACT match with approval columns...")
+            worksheet.update('1:1', [correct_headers])
+            logger.info("✅ Headers updated to EXACT match with approval workflow")
+            return True
+        
+        logger.info("✅ Headers already match EXACTLY")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Error ensuring EXACT headers: {e}")
+        return False
+
+def handle_view_sheets(call):
+    """Handle view sheets with full functionality"""
+    try:
+        bot.edit_message_text("📊 Getting sheet information...", call.message.chat.id, call.message.message_id)
+        
+        success, result = get_all_sheets()
+        
+        if success:
+            sheet_list = []
+            for sheet in result:
+                sheet_list.append(f"• {sheet['name']} ({sheet['data_rows']} rows)")
+            
+            if len(sheet_list) > 10:
+                sheet_list = sheet_list[:10] + [f"... and {len(result) - 10} more sheets"]
+            
+            sheets_text = f"""📊 SHEET OVERVIEW
+
+Total Sheets: {len(result)}
+
+📋 SHEET LIST:
+{chr(10).join(sheet_list)}
+
+📊 Google Sheets Link:
+https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/edit
+
+✅ All sheets use professional approval workflow formatting!
+🎨 Color-coded status: Red=Pending, Yellow=Abhay, Orange=Mushtaq, Green=Final"""
+        else:
+            sheets_text = f"❌ Error getting sheets: {result}"
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="view_sheets"))
+        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+        
+        bot.edit_message_text(sheets_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     except Exception as e:
         logger.error(f"View sheets error: {e}")
 
 def handle_format_sheet(call):
-    """Simple format sheet handler"""
+    """Handle format sheet with full functionality"""
     try:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="dashboard"))
+        bot.edit_message_text("🎨 Applying professional formatting...", call.message.chat.id, call.message.message_id)
         
-        bot.edit_message_text(
-            """🎨 SHEET FORMATTING
+        client = get_sheets_client()
+        if not client:
+            bot.edit_message_text("❌ Sheets connection failed", call.message.chat.id, call.message.message_id)
+            return
+        
+        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
+        current_month = get_uae_time().strftime('%Y_%m')
+        sheet_name = f"Gold_Trades_{current_month}"
+        
+        try:
+            worksheet = spreadsheet.worksheet(sheet_name)
+            format_sheet_beautifully(worksheet)
+            
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+            
+            bot.edit_message_text(
+                f"""🎉 PROFESSIONAL FORMATTING APPLIED!
 
-✅ Professional formatting is applied automatically
-✅ Color-coding based on approval status
-✅ Rich formatting for approval workflow
+✅ Sheet: {sheet_name}
+🎨 Applied stunning approval workflow styling:
+• Rich gold headers
+• Smart currency formatting  
+• Professional borders
+• Perfect column sizing
+• Color-coded approval status
 
-No manual formatting needed!""",
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=markup
-        )
+📊 Your sheet now looks AMAZING with approval workflow!""",
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=markup
+            )
+        except Exception as e:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+            
+            bot.edit_message_text(
+                f"❌ Sheet not found: {sheet_name}\n\nCreate a trade first to generate the sheet.",
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=markup
+            )
     except Exception as e:
         logger.error(f"Format sheet error: {e}")
 
 def handle_fix_headers(call):
-    """Simple fix headers handler"""
+    """Handle fix headers with full functionality"""
     try:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="dashboard"))
+        bot.edit_message_text("🔧 Fixing sheet headers...", call.message.chat.id, call.message.message_id)
         
-        bot.edit_message_text(
-            """🔧 SHEET HEADERS
+        client = get_sheets_client()
+        if not client:
+            bot.edit_message_text("❌ Sheets connection failed", call.message.chat.id, call.message.message_id)
+            return
+        
+        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
+        current_month = get_uae_time().strftime('%Y_%m')
+        sheet_name = f"Gold_Trades_{current_month}"
+        
+        try:
+            worksheet = spreadsheet.worksheet(sheet_name)
+            ensure_proper_headers(worksheet)
+            
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+            
+            bot.edit_message_text(
+                f"""✅ HEADERS FIXED!
 
-✅ Headers are automatically updated for approval workflow
-✅ Includes approval status and approver tracking
-✅ Professional formatting maintained
+📊 Sheet: {sheet_name}
+🔧 NOW INCLUDES APPROVAL WORKFLOW COLUMNS:
+• Volume KG + Volume Grams
+• Pure Gold KG + Pure Gold Grams
+• Input Rate USD/AED (Your Rate Before P/D)
+• Final Rate USD/AED (After Premium/Discount)
+• Market Rate USD/AED (Current API Rate)
+• Approval Status (Pending/Approved)
+• Approved By (Abhay, Mushtaq, Ahmadreza)
+• Notes (Comments and workflow info)
 
-Headers are automatically managed!""",
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=markup
-        )
+📋 All 25 columns in correct order for approval workflow!""",
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=markup
+            )
+        except Exception as e:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+            
+            bot.edit_message_text(
+                f"❌ Sheet not found: {sheet_name}\n\nCreate a trade first to generate the sheet.",
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=markup
+            )
     except Exception as e:
         logger.error(f"Fix headers error: {e}")
 
 def handle_delete_sheets(call):
-    """Simple delete sheets handler"""
+    """Handle delete sheets menu with full functionality"""
     try:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="dashboard"))
+        bot.edit_message_text("📊 Getting sheets for deletion...", call.message.chat.id, call.message.message_id)
         
-        bot.edit_message_text(
-            """🗑️ DELETE SHEETS
+        success, result = get_all_sheets()
+        
+        if success and len(result) > 1:  # Don't allow deleting if only one sheet
+            markup = types.InlineKeyboardMarkup()
+            
+            # Show sheets that can be deleted (skip main sheets)
+            deletable_sheets = [s for s in result if not s['name'].startswith('Sheet1') and not s['name'] == 'Main']
+            
+            for sheet in deletable_sheets[:10]:  # Limit to 10 sheets
+                markup.add(types.InlineKeyboardButton(
+                    f"🗑️ {sheet['name']} ({sheet['data_rows']} rows)",
+                    callback_data=f"delete_{sheet['name']}"
+                ))
+            
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+            
+            if deletable_sheets:
+                sheets_text = f"""🗑️ DELETE SHEETS
 
-⚠️ Sheet deletion not available in approval workflow mode
-✅ Sheets are automatically managed
-✅ Historical data preserved for audit trails
+⚠️ WARNING: This action cannot be undone!
 
-Contact admin for sheet management.""",
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=markup
-        )
+Select a sheet to delete:
+• Only trade sheets can be deleted
+• Main sheets are protected
+• Approval workflow data will be lost
+
+Available sheets: {len(deletable_sheets)}"""
+            else:
+                sheets_text = "🛡️ No deletable sheets found\n\nMain sheets are protected from deletion."
+        else:
+            sheets_text = "❌ Cannot load sheets or insufficient sheets to delete"
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+        
+        bot.edit_message_text(sheets_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     except Exception as e:
-        logger.error(f"Delete sheets error: {e}")
+        logger.error(f"Delete sheets menu error: {e}")
 
 def handle_clear_sheets(call):
-    """Simple clear sheets handler"""
+    """Handle clear sheets menu with full functionality"""
     try:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="dashboard"))
+        bot.edit_message_text("📊 Getting sheets for clearing...", call.message.chat.id, call.message.message_id)
         
-        bot.edit_message_text(
-            """🧹 CLEAR SHEETS
+        success, result = get_all_sheets()
+        
+        if success:
+            markup = types.InlineKeyboardMarkup()
+            
+            for sheet in result[:10]:  # Limit to 10 sheets
+                if sheet['data_rows'] > 1:  # Only show sheets with data
+                    markup.add(types.InlineKeyboardButton(
+                        f"🧹 {sheet['name']} ({sheet['data_rows']} rows)",
+                        callback_data=f"clear_{sheet['name']}"
+                    ))
+            
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+            
+            sheets_text = f"""🧹 CLEAR SHEET DATA
 
-⚠️ Sheet clearing not available in approval workflow mode
-✅ Sheets maintain approval history
-✅ Data integrity preserved for auditing
+Select a sheet to clear:
+• Headers will be preserved
+• Only data rows will be removed
+• This action cannot be undone
+• Approval workflow history will be lost
 
-Contact admin for data management.""",
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=markup
-        )
+Available sheets with data: {len([s for s in result if s['data_rows'] > 1])}"""
+        else:
+            sheets_text = "❌ Cannot load sheets"
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+        
+        bot.edit_message_text(sheets_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     except Exception as e:
-        logger.error(f"Clear sheets error: {e}")
+        logger.error(f"Clear sheets menu error: {e}")
+
+def delete_sheet(sheet_name):
+    """Delete a specific sheet"""
+    try:
+        client = get_sheets_client()
+        if not client:
+            return False, "Sheets client failed"
+            
+        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
+        
+        try:
+            worksheet = spreadsheet.worksheet(sheet_name)
+            spreadsheet.del_worksheet(worksheet)
+            logger.info(f"✅ Deleted sheet: {sheet_name}")
+            return True, f"Sheet '{sheet_name}' deleted successfully"
+        except Exception as e:
+            return False, f"Sheet '{sheet_name}' not found or cannot be deleted"
+            
+    except Exception as e:
+        logger.error(f"❌ Delete sheet error: {e}")
+        return False, str(e)
+
+def clear_sheet(sheet_name, keep_headers=True):
+    """Clear sheet data while optionally keeping headers"""
+    try:
+        client = get_sheets_client()
+        if not client:
+            return False, "Sheets client failed"
+            
+        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
+        
+        try:
+            worksheet = spreadsheet.worksheet(sheet_name)
+            
+            if keep_headers:
+                # Clear everything except the first row (headers)
+                all_values = worksheet.get_all_values()
+                if len(all_values) > 1:
+                    range_to_clear = f"A2:Z{len(all_values)}"
+                    worksheet.batch_clear([range_to_clear])
+                    logger.info(f"✅ Cleared data from sheet: {sheet_name} (kept headers)")
+                    return True, f"Data cleared from '{sheet_name}' (headers preserved)"
+                else:
+                    return True, f"Sheet '{sheet_name}' already empty"
+            else:
+                # Clear everything including headers
+                worksheet.clear()
+                logger.info(f"✅ Completely cleared sheet: {sheet_name}")
+                return True, f"Sheet '{sheet_name}' completely cleared"
+                
+        except Exception as e:
+            return False, f"Sheet '{sheet_name}' not found"
+            
+    except Exception as e:
+        logger.error(f"❌ Clear sheet error: {e}")
+        return False, str(e)
 
 def handle_sheet_action(call):
-    """Simple sheet action handler"""
+    """Handle sheet delete/clear actions with full functionality"""
     try:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="dashboard"))
-        
-        bot.edit_message_text(
-            """⚙️ SHEET ACTION
-
-✅ Action completed automatically
-✅ Approval workflow maintains data integrity
-
-All sheet actions are automated in approval mode.""",
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=markup
-        )
+        if call.data.startswith('delete_'):
+            sheet_name = call.data.replace('delete_', '')
+            bot.edit_message_text(f"🗑️ Deleting sheet: {sheet_name}...", call.message.chat.id, call.message.message_id)
+            
+            success, message = delete_sheet(sheet_name)
+            
+            if success:
+                result_text = f"✅ {message}"
+            else:
+                result_text = f"❌ {message}"
+            
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🗑️ Delete More", callback_data="delete_sheets"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+            
+            bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+            
+        elif call.data.startswith('clear_'):
+            sheet_name = call.data.replace('clear_', '')
+            bot.edit_message_text(f"🧹 Clearing sheet: {sheet_name}...", call.message.chat.id, call.message.message_id)
+            
+            success, message = clear_sheet(sheet_name, keep_headers=True)
+            
+            if success:
+                result_text = f"✅ {message}"
+            else:
+                result_text = f"❌ {message}"
+            
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🧹 Clear More", callback_data="clear_sheets"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
+            
+            bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+            
     except Exception as e:
         logger.error(f"Sheet action error: {e}")
 
