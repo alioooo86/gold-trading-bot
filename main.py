@@ -971,13 +971,14 @@ def start_command(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
-    """Handle all callbacks - COMPLETE WITH APPROVAL WORKFLOW"""
+    """Handle all callbacks - COMPLETE WITH ALL TRADING STEPS + APPROVAL + FIXES"""
     try:
         user_id = call.from_user.id
         data = call.data
         
         logger.info(f"📱 Callback: {user_id} -> {data}")
         
+        # ENSURE ALL CRITICAL CALLBACKS ARE HANDLED
         if data.startswith('login_'):
             handle_login(call)
         elif data == 'show_rate':
@@ -1000,6 +1001,8 @@ def handle_callbacks(call):
             handle_view_trade(call)
         elif data == 'system_status':
             handle_system_status(call)
+        elif data == 'test_save':
+            handle_test_save(call)
         elif data == 'sheet_management':
             handle_sheet_management(call)
         elif data == 'view_sheets':
@@ -1014,6 +1017,7 @@ def handle_callbacks(call):
             handle_clear_sheets(call)
         elif data.startswith('delete_') or data.startswith('clear_'):
             handle_sheet_action(call)
+        # TRADING FLOW HANDLERS
         elif data.startswith('operation_'):
             handle_operation(call)
         elif data.startswith('goldtype_'):
@@ -1032,16 +1036,19 @@ def handle_callbacks(call):
             handle_pd_type(call)
         elif data.startswith('premium_') or data.startswith('discount_'):
             handle_pd_amount(call)
+        # CRITICAL: ENSURE CONFIRM_TRADE IS HANDLED
         elif data == 'confirm_trade':
+            logger.info(f"🔄 CONFIRM_TRADE callback received for user {user_id}")
             handle_confirm_trade(call)
         elif data == 'cancel_trade':
             handle_cancel_trade(call)
         elif data == 'start':
             start_command(call.message)
         else:
+            logger.warning(f"⚠️ Unhandled callback: {data}")
             try:
                 bot.edit_message_text(
-                    "🚧 Feature under development...",
+                    f"🚧 Feature under development: {data}",
                     call.message.chat.id,
                     call.message.message_id,
                     reply_markup=types.InlineKeyboardMarkup().add(
@@ -1054,9 +1061,9 @@ def handle_callbacks(call):
         bot.answer_callback_query(call.id)
         
     except Exception as e:
-        logger.error(f"❌ Callback error: {e}")
+        logger.error(f"❌ Critical callback error for {call.data}: {e}")
         try:
-            bot.answer_callback_query(call.id, f"Error: {str(e)}")
+            bot.answer_callback_query(call.id, f"Error: {str(e)[:50]}")
         except:
             pass
 
@@ -1108,7 +1115,7 @@ Type the PIN now:""",
         logger.error(f"Login error: {e}")
 
 def handle_dashboard(call):
-    """Dashboard with approval workflow access"""
+    """Dashboard with approval workflow access - ENHANCED WITH SAVE TEST"""
     try:
         fetch_gold_rate()
         
@@ -1136,8 +1143,9 @@ def handle_dashboard(call):
         markup.add(types.InlineKeyboardButton("💰 Live Rate", callback_data="show_rate"))
         markup.add(types.InlineKeyboardButton("🔄 Refresh Rate", callback_data="force_refresh_rate"))
         
-        # Add sheet management for admin users
+        # Add debugging test button for admins
         if 'admin' in permissions:
+            markup.add(types.InlineKeyboardButton("🧪 Test Save Function", callback_data="test_save"))
             markup.add(types.InlineKeyboardButton("🗂️ Sheet Management", callback_data="sheet_management"))
         
         markup.add(types.InlineKeyboardButton("🔧 System Status", callback_data="system_status"))
@@ -1174,6 +1182,92 @@ def handle_dashboard(call):
         bot.edit_message_text(dashboard_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
+
+def handle_test_save(call):
+    """Test save functionality for debugging"""
+    try:
+        logger.info(f"🧪 TEST SAVE function called by user {call.from_user.id}")
+        
+        user_id = call.from_user.id
+        session = user_sessions.get(user_id, {})
+        dealer = session.get("dealer")
+        
+        if not dealer or 'admin' not in dealer.get('permissions', []):
+            bot.edit_message_text("❌ Admin access required", call.message.chat.id, call.message.message_id)
+            return
+        
+        bot.edit_message_text("🧪 Testing save functionality...", call.message.chat.id, call.message.message_id)
+        
+        # Create a test trade session
+        test_session = TradeSession(user_id, dealer)
+        test_session.operation = "BUY"
+        test_session.gold_type = {"name": "Kilo Bar", "code": "KB", "weight_grams": 1000.0}
+        test_session.gold_purity = {"name": "999 (99.9% Pure Gold)", "value": 999}
+        test_session.volume_kg = 1.0
+        test_session.volume_grams = 1000.0
+        test_session.quantity = 1
+        test_session.customer = "TEST_CUSTOMER"
+        test_session.rate_type = "market"
+        test_session.pd_type = "premium"
+        test_session.pd_amount = 0
+        test_session.final_rate_per_oz = market_data['gold_usd_oz']
+        test_session.price = 100000  # Test price
+        test_session.approval_status = "pending"
+        
+        logger.info(f"🧪 Created test session: {test_session.session_id}")
+        
+        # Test the save function
+        try:
+            success, result = save_trade_to_sheets(test_session)
+            logger.info(f"🧪 Test save result: success={success}, result={result}")
+            
+            if success:
+                result_text = f"""✅ SAVE TEST SUCCESSFUL!
+
+🧪 Test Trade ID: {test_session.session_id}
+📊 Result: {result}
+
+✅ Save functionality is working!
+✅ The issue might be in the trade confirmation flow
+✅ Check the logs for detailed debugging info
+
+This confirms that:
+• Google Sheets connection works
+• Save function works correctly  
+• Issue is likely in trade flow"""
+            else:
+                result_text = f"""❌ SAVE TEST FAILED!
+
+🧪 Test Trade ID: {test_session.session_id}
+❌ Error: {result}
+
+This indicates:
+• Problem with Google Sheets connection
+• Permission issues
+• Configuration problem
+
+Check the logs for detailed error info."""
+                
+        except Exception as save_error:
+            logger.error(f"🧪 Test save exception: {save_error}")
+            result_text = f"""❌ SAVE TEST EXCEPTION!
+
+🧪 Exception: {save_error}
+
+This indicates a code-level issue with the save function."""
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🧪 Test Again", callback_data="test_save"))
+        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
+        
+        bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+        
+    except Exception as e:
+        logger.error(f"❌ Test save error: {e}")
+        try:
+            bot.edit_message_text(f"❌ Test error: {e}", call.message.chat.id, call.message.message_id)
+        except:
+            pass
 
 def handle_approval_dashboard(call):
     """Approval dashboard for approvers"""
