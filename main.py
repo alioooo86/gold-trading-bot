@@ -12,6 +12,7 @@
 ✅ FIXED: Trades now save to sheets IMMEDIATELY upon confirmation
 🎨 Stunning gold-themed sheets with business-grade presentation
 🚀 Ready to run on Railway with automatic restarts!
+🔥 NEW: Clear sheets also clears approval dashboard + Delete individual trades
 """
 
 import os
@@ -740,6 +741,31 @@ def add_comment_to_trade(trade_id, commenter_name, comment):
         logger.error(f"❌ Comment error: {e}")
         return False, str(e)
 
+# 🔥 NEW: Delete trade from approval workflow
+def delete_trade_from_approval(trade_id, deleter_name):
+    """Delete trade completely from approval workflow"""
+    try:
+        if trade_id not in pending_trades:
+            return False, "Trade not found in approval workflow"
+        
+        trade = pending_trades[trade_id]
+        
+        # Log the deletion
+        logger.info(f"🗑️ Deleting trade from approval: {trade_id} by {deleter_name}")
+        
+        # Remove from pending trades
+        del pending_trades[trade_id]
+        
+        # Also remove from approved trades if it exists there
+        if trade_id in approved_trades:
+            del approved_trades[trade_id]
+        
+        return True, f"Trade {trade_id[-8:]} completely deleted from approval workflow by {deleter_name}"
+        
+    except Exception as e:
+        logger.error(f"❌ Delete trade error: {e}")
+        return False, str(e)
+
 def update_trade_status_in_sheets(trade_session):
     """Update existing trade status in sheets"""
     try:
@@ -806,9 +832,6 @@ def update_trade_status_in_sheets(trade_session):
                     color_format = {"backgroundColor": {"red": 0.8, "green": 1.0, "blue": 0.8}}
                 elif approval_status == "rejected":
                     color_format = {"backgroundColor": {"red": 0.9, "green": 0.6, "blue": 0.6}}
-                elif approval_status == "deleted":
-                    # Dark gray for deleted trades
-                    color_format = {"backgroundColor": {"red": 0.7, "green": 0.7, "blue": 0.7}}
                 else:
                     color_format = {"backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}}
                 
@@ -981,9 +1004,6 @@ def save_trade_to_sheets(session):
             elif approval_status == "rejected":
                 # Dark red for rejected
                 color_format = {"backgroundColor": {"red": 0.9, "green": 0.6, "blue": 0.6}}
-            elif approval_status == "deleted":
-                # Dark gray for deleted
-                color_format = {"backgroundColor": {"red": 0.7, "green": 0.7, "blue": 0.7}}
             else:
                 # Default white
                 color_format = {"backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}}
@@ -1053,6 +1073,7 @@ def start_command(message):
 ✅ Approve/Reject/Comment functionality
 ✅ Professional approval tracking
 ✅ TRADES SAVE TO SHEETS IMMEDIATELY!
+🔥 NEW: Clear sheets + Delete individual trades
 
 🔒 SELECT DEALER TO LOGIN:"""
         
@@ -1068,7 +1089,7 @@ def start_command(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
-    """Handle all callbacks - COMPLETE WITH ALL TRADING STEPS + APPROVAL + FIXES"""
+    """Handle all callbacks - COMPLETE WITH ALL TRADING STEPS + APPROVAL + FIXES + DELETE TRADES"""
     try:
         user_id = call.from_user.id
         data = call.data
@@ -1096,10 +1117,9 @@ def handle_callbacks(call):
             handle_comment_trade(call)
         elif data.startswith('view_trade_'):
             handle_view_trade(call)
+        # 🔥 NEW: Delete individual trades
         elif data.startswith('delete_trade_'):
-            handle_delete_trade_from_dashboard(call)
-        elif data.startswith('confirm_delete_trade_'):
-            handle_confirm_delete_trade(call)
+            handle_delete_trade(call)
         elif data == 'system_status':
             handle_system_status(call)
         elif data == 'test_save':
@@ -1278,6 +1298,7 @@ def handle_dashboard(call):
 • Color-Coded Approval Status ✅
 • Instant Telegram Notifications ✅
 • IMMEDIATE SHEET SAVING ✅
+🔥 NEW: Clear sheets + Delete trades ✅
 
 👆 SELECT ACTION:"""
         
@@ -1421,7 +1442,7 @@ def handle_approval_dashboard(call):
         logger.error(f"Approval dashboard error: {e}")
 
 def handle_view_trade(call):
-    """View trade details for approval with DELETE BUTTON for admin/Ahmadreza"""
+    """View trade details for approval WITH DELETE BUTTON FOR ADMIN/AHMADREZA"""
     try:
         trade_id = call.data.replace("view_trade_", "")
         
@@ -1461,6 +1482,7 @@ def handle_view_trade(call):
         
         permissions = dealer.get('permissions', [])
         can_approve = False
+        can_delete = False
         
         # Check if user can approve at current stage
         if (dealer['name'] == "Abhay" and trade.approval_status == "pending" and 'approve' in permissions):
@@ -1469,6 +1491,10 @@ def handle_view_trade(call):
             can_approve = True
         elif (dealer['name'] == "Ahmadreza" and trade.approval_status == "mushtaq_approved" and 'final_approve' in permissions):
             can_approve = True
+        
+        # 🔥 NEW: Check if user can delete (admin or Ahmadreza with final_approve)
+        if 'admin' in permissions or 'final_approve' in permissions:
+            can_delete = True
         
         if can_approve:
             markup.add(types.InlineKeyboardButton(f"✅ Approve #{trade_id[-4:]}", callback_data=f"approve_{trade_id}"))
@@ -1479,9 +1505,9 @@ def handle_view_trade(call):
         if 'comment' in permissions:
             markup.add(types.InlineKeyboardButton(f"💬 Add Comment", callback_data=f"comment_{trade_id}"))
         
-        # 🔥 NEW: DELETE BUTTON for admin and Ahmadreza only
-        if 'admin' in permissions or dealer['name'] == 'Ahmadreza':
-            markup.add(types.InlineKeyboardButton(f"🗑️ DELETE TRADE #{trade_id[-4:]}", callback_data=f"delete_trade_{trade_id}"))
+        # 🔥 NEW: Add delete button for authorized users
+        if can_delete:
+            markup.add(types.InlineKeyboardButton(f"🗑️ Delete #{trade_id[-4:]}", callback_data=f"delete_trade_{trade_id}"))
         
         markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="approval_dashboard"))
         
@@ -1497,11 +1523,6 @@ def handle_view_trade(call):
             "mushtaq_approved": "🟠 MUSHTAQ APPROVED",
             "final_approved": "🟢 FINAL APPROVED"
         }
-        
-        # 🔥 NEW: Show delete permissions
-        delete_permissions = ""
-        if 'admin' in permissions or dealer['name'] == 'Ahmadreza':
-            delete_permissions = f"\n🗑️ DELETE ACCESS: {dealer['name']} can delete this trade"
         
         trade_text = f"""📊 TRADE DETAILS #{trade_id[-8:]}
 
@@ -1528,11 +1549,69 @@ def handle_view_trade(call):
 💬 COMMENTS:
 {chr(10).join(trade.comments) if trade.comments else 'No comments yet'}
 
-🎯 Next Approver: {'Abhay' if trade.approval_status == 'pending' else 'Mushtaq' if trade.approval_status == 'abhay_approved' else 'Ahmadreza' if trade.approval_status == 'mushtaq_approved' else 'Completed'}{delete_permissions}"""
+🎯 Next Approver: {'Abhay' if trade.approval_status == 'pending' else 'Mushtaq' if trade.approval_status == 'abhay_approved' else 'Ahmadreza' if trade.approval_status == 'mushtaq_approved' else 'Completed'}
+
+🔒 PERMISSIONS: {'Can Delete' if can_delete else 'View Only'}"""
         
         bot.edit_message_text(trade_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     except Exception as e:
         logger.error(f"View trade error: {e}")
+
+# 🔥 NEW: Handle individual trade deletion
+def handle_delete_trade(call):
+    """Handle individual trade deletion"""
+    try:
+        trade_id = call.data.replace("delete_trade_", "")
+        user_id = call.from_user.id
+        session = user_sessions.get(user_id, {})
+        dealer = session.get("dealer")
+        
+        if not dealer:
+            bot.edit_message_text("❌ Please login again", call.message.chat.id, call.message.message_id)
+            return
+        
+        # Check permissions
+        permissions = dealer.get('permissions', [])
+        if not ('admin' in permissions or 'final_approve' in permissions):
+            bot.edit_message_text("❌ Insufficient permissions to delete trades", call.message.chat.id, call.message.message_id)
+            return
+        
+        if trade_id not in pending_trades:
+            bot.edit_message_text("❌ Trade not found", call.message.chat.id, call.message.message_id)
+            return
+        
+        # Delete the trade
+        success, message = delete_trade_from_approval(trade_id, dealer['name'])
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
+        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
+        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
+        
+        if success:
+            result_text = f"""✅ TRADE DELETED SUCCESSFULLY
+
+{message}
+
+⚠️ NOTE: 
+• Trade removed from approval workflow
+• Sheet data remains unchanged
+• This action cannot be undone
+
+👆 SELECT NEXT ACTION:"""
+        else:
+            result_text = f"""❌ DELETE FAILED
+
+{message}
+
+Please try again or contact admin.
+
+👆 SELECT ACTION:"""
+        
+        bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+        
+    except Exception as e:
+        logger.error(f"Delete trade error: {e}")
 
 def handle_approve_trade(call):
     """Handle trade approval with enhanced navigation"""
@@ -1869,11 +1948,9 @@ def handle_system_status(call):
 ✅ Decimal quantities support
 ✅ IMMEDIATE sheet saving
 ✅ Enhanced error logging
-✅ Admin/Ahmadreza trade deletion
-✅ Clear sheets = clear approval dashboard
+🔥 NEW: Clear sheets + Delete trades
 
 🔥 FIXED: TRADES SAVE TO SHEETS IMMEDIATELY!
-🗑️ NEW: Admin/Ahmadreza can delete trades from approval dashboard!
 
 💡 TROUBLESHOOTING:
 If trades don't appear immediately:
@@ -2823,326 +2900,8 @@ def handle_cancel_trade(call):
     except Exception as e:
         logger.error(f"Cancel trade error: {e}")
 
-# Handle trade text inputs including approval workflow
-@bot.message_handler(func=lambda message: True)
-def handle_text(message):
-    """Handle text messages including approval workflow inputs"""
-    try:
-        user_id = message.from_user.id
-        text = message.text.strip()
-        
-        if user_id not in user_sessions:
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🚀 START", callback_data="start"))
-            bot.send_message(message.chat.id, "Please use /start", reply_markup=markup)
-            return
-        
-        session_data = user_sessions[user_id]
-        
-        # PIN authentication
-        if session_data.get("step") == "awaiting_pin":
-            try:
-                bot.delete_message(message.chat.id, message.message_id)
-                logger.info("🗑️ PIN deleted for security")
-            except:
-                pass
-            
-            if text == session_data["temp_dealer_id"]:
-                dealer = session_data["temp_dealer"]
-                user_sessions[user_id] = {"step": "authenticated", "dealer": dealer}
-                
-                markup = types.InlineKeyboardMarkup()
-                if any(p in dealer.get('permissions', []) for p in ['buy', 'sell']):
-                    markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
-                if any(p in dealer.get('permissions', []) for p in ['approve', 'reject', 'comment', 'final_approve']):
-                    markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
-                markup.add(types.InlineKeyboardButton("💰 Live Rate", callback_data="show_rate"))
-                
-                role_info = dealer.get('role', dealer['level'].title())
-                
-                bot.send_message(
-                    user_id, 
-                    f"""✅ Welcome {dealer['name']}! 
-
-🥇 Gold Trading Bot v4.7 - IMMEDIATE SAVE + APPROVAL WORKFLOW! ✨
-🚀 Role: {role_info}
-💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
-🇦🇪 UAE Time: {market_data['last_update']} (Updates every 2min)
-
-🔥 TRADES NOW SAVE TO SHEETS IMMEDIATELY!
-📲 Telegram notifications are ACTIVE for your approvals!
-
-Ready for professional gold trading with instant sheet saving!""", 
-                    reply_markup=markup
-                )
-                logger.info(f"✅ Login: {dealer['name']} (IMMEDIATE SAVE v4.7)")
-            else:
-                bot.send_message(user_id, "❌ Wrong PIN. Please try again.")
-        
-        # Handle approval workflow inputs
-        elif session_data.get("awaiting_input"):
-            try:
-                bot.delete_message(message.chat.id, message.message_id)
-                
-                input_type = session_data["awaiting_input"]
-                trade_session = session_data.get("trade_session")
-                
-                # Handle rejection reason
-                if input_type.startswith("reject_reason_"):
-                    trade_id = input_type.replace("reject_reason_", "")
-                    dealer = session_data.get("dealer")
-                    
-                    if dealer and len(text) <= 200:
-                        success, message_result = reject_trade(trade_id, dealer['name'], text)
-                        
-                        markup = types.InlineKeyboardMarkup()
-                        markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
-                        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
-                        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
-                        
-                        if success:
-                            result_text = f"""✅ TRADE REJECTED SUCCESSFULLY
-
-{message_result}
-
-📊 SHEET STATUS:
-• Trade marked as REJECTED
-• Removed from approval workflow
-• All parties notified
-
-👆 SELECT NEXT ACTION:"""
-                            bot.send_message(user_id, result_text, reply_markup=markup)
-                        else:
-                            result_text = f"""❌ REJECTION FAILED
-
-{message_result}
-
-Please try again or contact admin.
-
-👆 SELECT ACTION:"""
-                            bot.send_message(user_id, result_text, reply_markup=markup)
-                    else:
-                        bot.send_message(user_id, "❌ Reason too long (max 200 characters)")
-                
-                # Handle adding comment
-                elif input_type.startswith("add_comment_"):
-                    trade_id = input_type.replace("add_comment_", "")
-                    dealer = session_data.get("dealer")
-                    
-                    if dealer and len(text) <= 200:
-                        success, message_result = add_comment_to_trade(trade_id, dealer['name'], text)
-                        
-                        markup = types.InlineKeyboardMarkup()
-                        markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
-                        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
-                        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
-                        
-                        if success:
-                            result_text = f"""✅ COMMENT ADDED SUCCESSFULLY
-
-{message_result}
-
-📊 SHEET STATUS:
-• Comment added to trade record
-• Visible to all approvers
-• Included in approval history
-
-👆 SELECT NEXT ACTION:"""
-                            bot.send_message(user_id, result_text, reply_markup=markup)
-                        else:
-                            result_text = f"""❌ COMMENT FAILED
-
-{message_result}
-
-Please try again or contact admin.
-
-👆 SELECT ACTION:"""
-                            bot.send_message(user_id, result_text, reply_markup=markup)
-                    else:
-                        bot.send_message(user_id, "❌ Comment too long (max 200 characters)")
-                
-                # FIXED: Handle quantity input - SUPPORTS DECIMALS
-                elif input_type == "quantity" and trade_session:
-                    try:
-                        quantity = float(text)  # CHANGED: Allow decimal quantities
-                        if 0.01 <= quantity <= 10000:  # CHANGED: Allow small decimals
-                            # Calculate total weight based on quantity
-                            weight_per_piece_grams = trade_session.gold_type['weight_grams']
-                            total_weight_grams = quantity * weight_per_piece_grams
-                            total_weight_kg = total_weight_grams / 1000
-                            
-                            trade_session.volume_kg = total_weight_kg
-                            trade_session.volume_grams = total_weight_grams
-                            trade_session.quantity = quantity
-                            trade_session.step = "purity"
-                            
-                            markup = types.InlineKeyboardMarkup()
-                            for purity in GOLD_PURITIES:
-                                markup.add(types.InlineKeyboardButton(
-                                    f"⚖️ {purity['name']}",
-                                    callback_data=f"purity_{purity['value']}"
-                                ))
-                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
-                            
-                            # Format quantity display properly for decimals
-                            qty_display = f"{quantity:g}" if quantity == int(quantity) else f"{quantity:.3f}".rstrip('0').rstrip('.')
-                            
-                            bot.send_message(
-                                user_id,
-                                f"""✅ Quantity set: {qty_display} × {trade_session.gold_type['name']}
-✅ Total Weight: {format_weight_combined(total_weight_kg)}
-
-📊 NEW TRADE - STEP 4/8 (PURITY)
-
-⚖️ SELECT PURITY:""",
-                                reply_markup=markup
-                            )
-                        else:
-                            bot.send_message(user_id, "❌ Quantity must be 0.01-10000 pieces")
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid quantity. Enter number like: 2.5")
-                
-                elif input_type == "volume" and trade_session:
-                    volume = safe_float(text)
-                    if 0.001 <= volume <= 1000:
-                        trade_session.volume_kg = volume
-                        trade_session.volume_grams = kg_to_grams(volume)
-                        
-                        markup = types.InlineKeyboardMarkup()
-                        for customer in CUSTOMERS:
-                            markup.add(types.InlineKeyboardButton(
-                                f"👤 {customer}" if customer != "Custom" else f"✏️ {customer}",
-                                callback_data=f"customer_{customer}"
-                            ))
-                        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
-                        
-                        volume_oz = grams_to_oz(kg_to_grams(volume))
-                        
-                        bot.send_message(
-                            user_id,
-                            f"✅ Volume set: {format_weight_combined(volume)} = {volume_oz:.2f} troy oz\n\n📊 NEW TRADE - STEP 5/8 (CUSTOMER)\n\n👤 SELECT CUSTOMER:",
-                            reply_markup=markup
-                        )
-                    else:
-                        bot.send_message(user_id, "❌ Volume must be 0.001-1000 KG")
-                
-                elif input_type == "customer" and trade_session:
-                    if len(text) <= 50:
-                        trade_session.customer = text
-                        trade_session.step = "rate_choice"
-                        
-                        current_rate = market_data['gold_usd_oz']
-                        
-                        markup = types.InlineKeyboardMarkup()
-                        markup.add(types.InlineKeyboardButton("📊 Use Market Rate", callback_data="rate_market"))
-                        markup.add(types.InlineKeyboardButton("✏️ Enter Custom Rate", callback_data="rate_custom"))
-                        markup.add(types.InlineKeyboardButton("⚡ Rate Override", callback_data="rate_override"))
-                        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
-                        
-                        bot.send_message(
-                            user_id,
-                            f"""✅ Customer: {text}
-
-📊 NEW TRADE - STEP 6/8 (RATE SELECTION)
-
-💰 Current Market: ${current_rate:,.2f} USD/oz
-
-🎯 RATE OPTIONS:
-• 📊 Market Rate: Live rate + premium/discount
-• ✏️ Custom Rate: Your rate + premium/discount  
-• ⚡ Rate Override: Direct final rate
-
-💎 SELECT RATE SOURCE:""",
-                            reply_markup=markup
-                        )
-                    else:
-                        bot.send_message(user_id, "❌ Name too long (max 50)")
-                
-                elif input_type == "custom_rate" and trade_session:
-                    try:
-                        custom_rate = safe_float(text)
-                        if 1000 <= custom_rate <= 10000:
-                            trade_session.rate_per_oz = custom_rate
-                            trade_session.step = "pd_type"
-                            
-                            markup = types.InlineKeyboardMarkup()
-                            markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="pd_premium"))
-                            markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="pd_discount"))
-                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
-                            
-                            bot.send_message(
-                                user_id,
-                                f"""✅ Custom Rate Set: ${custom_rate:,.2f}/oz
-
-📊 NEW TRADE - STEP 7/8 (PREMIUM/DISCOUNT)
-
-🎯 SELECT PREMIUM OR DISCOUNT:
-
-💡 Premium = ADD to your rate
-💡 Discount = SUBTRACT from your rate
-
-💎 SELECT TYPE:""",
-                                reply_markup=markup
-                            )
-                        else:
-                            bot.send_message(user_id, "❌ Rate must be between $1,000 - $10,000 per ounce")
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid rate format. Please enter a number (e.g., 2650.00)")
-                
-                elif input_type == "override_rate" and trade_session:
-                    try:
-                        override_rate = safe_float(text)
-                        if 1000 <= override_rate <= 10000:
-                            trade_session.final_rate_per_oz = override_rate
-                            trade_session.step = "confirmation"
-                            
-                            # Skip premium/discount and go directly to confirmation
-                            show_confirmation(None, trade_session, user_id)
-                        else:
-                            bot.send_message(user_id, "❌ Rate must be between $1,000 - $10,000 per ounce")
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid rate format. Please enter a number (e.g., 2650.00)")
-                
-                # FIXED: Handle custom premium/discount amounts
-                elif input_type.startswith("custom_") and trade_session:
-                    pd_type = input_type.replace("custom_", "")  # "premium" or "discount"
-                    try:
-                        pd_amount = safe_float(text)
-                        if 0.01 <= pd_amount <= 500:
-                            trade_session.pd_amount = pd_amount
-                            
-                            # Calculate final rate
-                            if trade_session.rate_type == "market":
-                                base_rate = market_data['gold_usd_oz']
-                            else:  # custom
-                                base_rate = trade_session.rate_per_oz
-                            
-                            if pd_type == "premium":
-                                final_rate = base_rate + pd_amount
-                            else:  # discount
-                                final_rate = base_rate - pd_amount
-                            
-                            trade_session.final_rate_per_oz = final_rate
-                            
-                            # Show trade confirmation
-                            show_confirmation(None, trade_session, user_id)
-                        else:
-                            bot.send_message(user_id, "❌ Amount must be between $0.01 - $500.00 per ounce")
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid amount format. Please enter a number (e.g., 25.50)")
-                
-                del session_data["awaiting_input"]
-                
-            except ValueError:
-                bot.send_message(user_id, "❌ Invalid input")
-            except Exception as e:
-                bot.send_message(user_id, f"❌ Error: {e}")
-        
-    except Exception as e:
-        logger.error(f"❌ Text error: {e}")
-
 # ============================================================================
-# SHEET MANAGEMENT FUNCTIONS - ADMIN TOOLS
+# ENHANCED SHEET MANAGEMENT FUNCTIONS - ADMIN TOOLS WITH CLEAR + DELETE
 # ============================================================================
 
 def handle_sheet_management(call):
@@ -3179,6 +2938,11 @@ def handle_sheet_management(call):
 • Real-time status updates
 • Complete approval tracking
 • IMMEDIATE sheet saving
+
+🔥 NEW: Clear options now sync with approval dashboard
+• Clear sheet only (approval dashboard remains)
+• Clear approval dashboard only (sheets remain)
+• Clear both sheets AND approval dashboard
 
 ⚠️ Delete/Clear operations cannot be undone!
 
@@ -3568,35 +3332,65 @@ Available sheets: {len(deletable_sheets)}"""
     except Exception as e:
         logger.error(f"Delete sheets menu error: {e}")
 
+# 🔥 ENHANCED: Clear sheets with approval dashboard sync
 def handle_clear_sheets(call):
-    """Handle clear sheets menu with full functionality"""
+    """Handle clear sheets menu with approval dashboard sync options"""
     try:
-        bot.edit_message_text("📊 Getting sheets for clearing...", call.message.chat.id, call.message.message_id)
+        bot.edit_message_text("📊 Getting clear options...", call.message.chat.id, call.message.message_id)
         
         success, result = get_all_sheets()
         
         if success:
             markup = types.InlineKeyboardMarkup()
             
-            for sheet in result[:10]:  # Limit to 10 sheets
+            for sheet in result[:8]:  # Limit to 8 sheets to leave room for special options
                 if sheet['data_rows'] > 1:  # Only show sheets with data
                     markup.add(types.InlineKeyboardButton(
                         f"🧹 {sheet['name']} ({sheet['data_rows']} rows)",
                         callback_data=f"clear_{sheet['name']}"
                     ))
             
+            # 🔥 NEW: Add special approval dashboard options
+            pending_count = len(pending_trades)
+            approved_count = len(approved_trades)
+            total_approval_trades = pending_count + approved_count
+            
+            if total_approval_trades > 0:
+                markup.add(types.InlineKeyboardButton(
+                    f"🗑️ Clear Approval Dashboard ({total_approval_trades} trades)",
+                    callback_data="clear_APPROVAL_DASHBOARD"
+                ))
+            
+            # Add option to clear both sheet and approval dashboard
+            current_month_sheet = f"Gold_Trades_{get_uae_time().strftime('%Y_%m')}"
+            current_sheet_exists = any(s['name'] == current_month_sheet for s in result)
+            
+            if current_sheet_exists and total_approval_trades > 0:
+                markup.add(types.InlineKeyboardButton(
+                    f"🔥 Clear Current Sheet + Approval Dashboard",
+                    callback_data=f"clear_BOTH_{current_month_sheet}"
+                ))
+            
             markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
             
-            sheets_text = f"""🧹 CLEAR SHEET DATA
+            sheets_text = f"""🧹 CLEAR DATA OPTIONS
 
-Select a sheet to clear:
+🗂️ SHEET DATA:
 • Headers will be preserved
 • Only data rows will be removed
-• This action cannot be undone
-• Approval workflow history will be lost
-• 🔥 ALSO CLEARS approval dashboard trades
+• Cannot be undone
 
-Available sheets with data: {len([s for s in result if s['data_rows'] > 1])}"""
+📋 APPROVAL DASHBOARD:
+• Pending trades: {pending_count}
+• Approved trades: {approved_count}
+• Total approval trades: {total_approval_trades}
+
+🔥 SYNC OPTIONS:
+• Clear sheet only (approval dashboard remains)
+• Clear approval dashboard only (sheets remain)
+• Clear both simultaneously (full reset)
+
+⚠️ Choose what to clear:"""
         else:
             sheets_text = "❌ Cannot load sheets"
             markup = types.InlineKeyboardMarkup()
@@ -3627,8 +3421,9 @@ def delete_sheet(sheet_name):
         logger.error(f"❌ Delete sheet error: {e}")
         return False, str(e)
 
-def clear_sheet(sheet_name, keep_headers=True):
-    """Clear sheet data while optionally keeping headers + CLEAR APPROVAL DASHBOARD"""
+# 🔥 ENHANCED: Clear sheet with approval dashboard sync
+def clear_sheet(sheet_name, keep_headers=True, clear_approval_dashboard=False):
+    """Clear sheet data while optionally keeping headers AND sync approval dashboard"""
     try:
         client = get_sheets_client()
         if not client:
@@ -3639,174 +3434,52 @@ def clear_sheet(sheet_name, keep_headers=True):
         try:
             worksheet = spreadsheet.worksheet(sheet_name)
             
+            cleared_rows = 0
             if keep_headers:
                 # Clear everything except the first row (headers)
                 all_values = worksheet.get_all_values()
                 if len(all_values) > 1:
                     range_to_clear = f"A2:Z{len(all_values)}"
                     worksheet.batch_clear([range_to_clear])
-                    logger.info(f"✅ Cleared data from sheet: {sheet_name} (kept headers)")
-                    
-                    # 🔥 NEW: Also clear pending trades from approval dashboard
-                    if sheet_name.startswith("Gold_Trades_"):
-                        cleared_count = len(pending_trades)
-                        pending_trades.clear()
-                        approved_trades.clear()
-                        logger.info(f"✅ Cleared {cleared_count} trades from approval dashboard")
-                        return True, f"Data cleared from '{sheet_name}' (headers preserved) + {cleared_count} trades removed from approval dashboard"
-                    else:
-                        return True, f"Data cleared from '{sheet_name}' (headers preserved)"
+                    cleared_rows = len(all_values) - 1
+                    logger.info(f"✅ Cleared {cleared_rows} data rows from sheet: {sheet_name} (kept headers)")
                 else:
-                    return True, f"Sheet '{sheet_name}' already empty"
+                    logger.info(f"✅ Sheet '{sheet_name}' was already empty")
             else:
                 # Clear everything including headers
+                all_values = worksheet.get_all_values()
+                cleared_rows = len(all_values)
                 worksheet.clear()
+                logger.info(f"✅ Completely cleared sheet: {sheet_name}")
+            
+            # 🔥 NEW: Also clear approval dashboard if requested
+            if clear_approval_dashboard:
+                pending_count = len(pending_trades)
+                approved_count = len(approved_trades)
                 
-                # 🔥 NEW: Also clear pending trades from approval dashboard
-                if sheet_name.startswith("Gold_Trades_"):
-                    cleared_count = len(pending_trades)
-                    pending_trades.clear()
-                    approved_trades.clear()
-                    logger.info(f"✅ Completely cleared sheet + {cleared_count} trades from approval dashboard")
-                    return True, f"Sheet '{sheet_name}' completely cleared + {cleared_count} trades removed from approval dashboard"
-                else:
-                    logger.info(f"✅ Completely cleared sheet: {sheet_name}")
-                    return True, f"Sheet '{sheet_name}' completely cleared"
+                # Clear all pending and approved trades
+                pending_trades.clear()
+                approved_trades.clear()
                 
-def delete_trade_from_dashboard(trade_id, deleter_name):
-    """Delete trade from approval dashboard and update sheets"""
-    try:
-        if trade_id not in pending_trades:
-            return False, "Trade not found in approval dashboard"
-        
-        trade = pending_trades[trade_id]
-        
-        # Mark as deleted in sheets
-        trade.approval_status = "deleted"
-        trade.comments.append(f"DELETED by {deleter_name} from approval dashboard")
-        
-        # Update sheet with deleted status
-        try:
-            success, sheet_result = update_trade_status_in_sheets(trade)
-            if success:
-                logger.info(f"✅ Trade {trade_id} marked as DELETED in sheets")
+                logger.info(f"🗑️ Cleared approval dashboard: {pending_count} pending + {approved_count} approved trades")
+                
+                return True, f"Sheet '{sheet_name}' cleared ({cleared_rows} rows) + Approval dashboard cleared ({pending_count + approved_count} trades)"
             else:
-                logger.warning(f"⚠️ Failed to update sheet for deleted trade {trade_id}: {sheet_result}")
+                if cleared_rows > 0:
+                    return True, f"Data cleared from '{sheet_name}' ({cleared_rows} rows, headers preserved)"
+                else:
+                    return True, f"Sheet '{sheet_name}' was already empty"
+                
         except Exception as e:
-            logger.error(f"❌ Sheet update error for deleted trade {trade_id}: {e}")
-        
-        # Remove from pending trades
-        del pending_trades[trade_id]
-        logger.info(f"✅ Trade {trade_id} deleted from approval dashboard by {deleter_name}")
-        
-        return True, f"Trade deleted by {deleter_name}. Removed from approval workflow."
-        
+            return False, f"Sheet '{sheet_name}' not found"
+            
     except Exception as e:
-        logger.error(f"❌ Delete trade error: {e}")
+        logger.error(f"❌ Clear sheet error: {e}")
         return False, str(e)
 
-def handle_delete_trade_from_dashboard(call):
-    """Handle deleting trade from approval dashboard - ADMIN/AHMADREZA ONLY"""
-    try:
-        trade_id = call.data.replace("delete_trade_", "")
-        user_id = call.from_user.id
-        session = user_sessions.get(user_id, {})
-        dealer = session.get("dealer")
-        
-        if not dealer:
-            bot.edit_message_text("❌ Please login again", call.message.chat.id, call.message.message_id)
-            return
-        
-        # Check permissions - only admin or Ahmadreza can delete trades
-        permissions = dealer.get('permissions', [])
-        if not ('admin' in permissions or dealer['name'] == 'Ahmadreza'):
-            bot.edit_message_text("❌ Only admin or Ahmadreza can delete trades", call.message.chat.id, call.message.message_id)
-            return
-        
-        if trade_id not in pending_trades:
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Approval Dashboard", callback_data="approval_dashboard"))
-            bot.edit_message_text("❌ Trade not found in approval dashboard", call.message.chat.id, call.message.message_id, reply_markup=markup)
-            return
-        
-        trade = pending_trades[trade_id]
-        
-        # Show confirmation
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(f"❌ CONFIRM DELETE #{trade_id[-4:]}", callback_data=f"confirm_delete_trade_{trade_id}"))
-        markup.add(types.InlineKeyboardButton("🔙 Cancel", callback_data=f"view_trade_{trade_id}"))
-        
-        bot.edit_message_text(
-            f"""⚠️ CONFIRM TRADE DELETION
-
-Trade ID: #{trade_id[-8:]}
-Operation: {trade.operation.upper()}
-Customer: {trade.customer}
-Amount: {format_money_aed(trade.price)}
-Status: {trade.approval_status.upper()}
-
-❌ This will:
-• Mark trade as DELETED in sheets
-• Remove from approval workflow
-• Cannot be undone
-
-👤 Deleter: {dealer['name']} ({dealer.get('role', 'Admin')})
-
-⚠️ Are you sure you want to delete this trade?""",
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=markup
-        )
-    except Exception as e:
-        logger.error(f"Delete trade handler error: {e}")
-
-def handle_confirm_delete_trade(call):
-    """Handle confirmed trade deletion"""
-    try:
-        trade_id = call.data.replace("confirm_delete_trade_", "")
-        user_id = call.from_user.id
-        session = user_sessions.get(user_id, {})
-        dealer = session.get("dealer")
-        
-        if not dealer:
-            bot.edit_message_text("❌ Please login again", call.message.chat.id, call.message.message_id)
-            return
-        
-        success, message = delete_trade_from_dashboard(trade_id, dealer['name'])
-        
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
-        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
-        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
-        
-        if success:
-            result_text = f"""✅ TRADE DELETED SUCCESSFULLY
-
-{message}
-
-📊 SHEET STATUS:
-• Trade marked as DELETED in sheets
-• Removed from approval dashboard
-• Workflow terminated
-
-👤 Deleted by: {dealer['name']}
-
-👆 SELECT NEXT ACTION:"""
-        else:
-            result_text = f"""❌ DELETION FAILED
-
-{message}
-
-Please try again or contact admin.
-
-👆 SELECT ACTION:"""
-        
-        bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    except Exception as e:
-        logger.error(f"Confirm delete trade error: {e}")
-
+# 🔥 ENHANCED: Handle sheet actions with approval dashboard sync
 def handle_sheet_action(call):
-    """Handle sheet delete/clear actions with full functionality"""
+    """Handle sheet delete/clear actions with enhanced approval dashboard sync"""
     try:
         if call.data.startswith('delete_'):
             sheet_name = call.data.replace('delete_', '')
@@ -3824,20 +3497,47 @@ def handle_sheet_action(call):
             markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
             
             bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-            
+        
         elif call.data.startswith('clear_'):
-            sheet_name = call.data.replace('clear_', '')
-            bot.edit_message_text(f"🧹 Clearing sheet: {sheet_name}...", call.message.chat.id, call.message.message_id)
-            
-            success, message = clear_sheet(sheet_name, keep_headers=True)
-            
-            if success:
-                result_text = f"✅ {message}"
+            if call.data == "clear_APPROVAL_DASHBOARD":
+                # 🔥 NEW: Clear only approval dashboard
+                bot.edit_message_text("🗑️ Clearing approval dashboard...", call.message.chat.id, call.message.message_id)
+                
+                pending_count = len(pending_trades)
+                approved_count = len(approved_trades)
+                
+                pending_trades.clear()
+                approved_trades.clear()
+                
+                result_text = f"✅ Approval Dashboard Cleared Successfully\n\nRemoved:\n• {pending_count} pending trades\n• {approved_count} approved trades\n• Total: {pending_count + approved_count} trades\n\n⚠️ Sheet data remains unchanged"
+                
+            elif call.data.startswith('clear_BOTH_'):
+                # 🔥 NEW: Clear both sheet and approval dashboard
+                sheet_name = call.data.replace('clear_BOTH_', '')
+                bot.edit_message_text(f"🔥 Clearing sheet + approval dashboard...", call.message.chat.id, call.message.message_id)
+                
+                success, message = clear_sheet(sheet_name, keep_headers=True, clear_approval_dashboard=True)
+                
+                if success:
+                    result_text = f"✅ {message}"
+                else:
+                    result_text = f"❌ {message}"
+                    
             else:
-                result_text = f"❌ {message}"
+                # Regular sheet clear
+                sheet_name = call.data.replace('clear_', '')
+                bot.edit_message_text(f"🧹 Clearing sheet: {sheet_name}...", call.message.chat.id, call.message.message_id)
+                
+                success, message = clear_sheet(sheet_name, keep_headers=True, clear_approval_dashboard=False)
+                
+                if success:
+                    result_text = f"✅ {message}\n\n⚠️ Approval dashboard trades remain active"
+                else:
+                    result_text = f"❌ {message}"
             
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("🧹 Clear More", callback_data="clear_sheets"))
+            markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
             markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
             
             bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
@@ -3845,15 +3545,334 @@ def handle_sheet_action(call):
     except Exception as e:
         logger.error(f"Sheet action error: {e}")
 
+# Handle trade text inputs including approval workflow
+@bot.message_handler(func=lambda message: True)
+def handle_text(message):
+    """Handle text messages including approval workflow inputs"""
+    try:
+        user_id = message.from_user.id
+        text = message.text.strip()
+        
+        if user_id not in user_sessions:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🚀 START", callback_data="start"))
+            bot.send_message(message.chat.id, "Please use /start", reply_markup=markup)
+            return
+        
+        session_data = user_sessions[user_id]
+        
+        # PIN authentication
+        if session_data.get("step") == "awaiting_pin":
+            try:
+                bot.delete_message(message.chat.id, message.message_id)
+                logger.info("🗑️ PIN deleted for security")
+            except:
+                pass
+            
+            if text == session_data["temp_dealer_id"]:
+                dealer = session_data["temp_dealer"]
+                user_sessions[user_id] = {"step": "authenticated", "dealer": dealer}
+                
+                markup = types.InlineKeyboardMarkup()
+                if any(p in dealer.get('permissions', []) for p in ['buy', 'sell']):
+                    markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
+                if any(p in dealer.get('permissions', []) for p in ['approve', 'reject', 'comment', 'final_approve']):
+                    markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
+                markup.add(types.InlineKeyboardButton("💰 Live Rate", callback_data="show_rate"))
+                
+                role_info = dealer.get('role', dealer['level'].title())
+                
+                bot.send_message(
+                    user_id, 
+                    f"""✅ Welcome {dealer['name']}! 
+
+🥇 Gold Trading Bot v4.7 - IMMEDIATE SAVE + APPROVAL WORKFLOW! ✨
+🚀 Role: {role_info}
+💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
+🇦🇪 UAE Time: {market_data['last_update']} (Updates every 2min)
+
+🔥 TRADES NOW SAVE TO SHEETS IMMEDIATELY!
+📲 Telegram notifications are ACTIVE for your approvals!
+🗑️ NEW: Clear sheets + Delete individual trades!
+
+Ready for professional gold trading with instant sheet saving!""", 
+                    reply_markup=markup
+                )
+                logger.info(f"✅ Login: {dealer['name']} (IMMEDIATE SAVE v4.7)")
+            else:
+                bot.send_message(user_id, "❌ Wrong PIN. Please try again.")
+        
+        # Handle approval workflow inputs
+        elif session_data.get("awaiting_input"):
+            try:
+                bot.delete_message(message.chat.id, message.message_id)
+                
+                input_type = session_data["awaiting_input"]
+                trade_session = session_data.get("trade_session")
+                
+                # Handle rejection reason
+                if input_type.startswith("reject_reason_"):
+                    trade_id = input_type.replace("reject_reason_", "")
+                    dealer = session_data.get("dealer")
+                    
+                    if dealer and len(text) <= 200:
+                        success, message_result = reject_trade(trade_id, dealer['name'], text)
+                        
+                        markup = types.InlineKeyboardMarkup()
+                        markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
+                        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
+                        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
+                        
+                        if success:
+                            result_text = f"""✅ TRADE REJECTED SUCCESSFULLY
+
+{message_result}
+
+📊 SHEET STATUS:
+• Trade marked as REJECTED
+• Removed from approval workflow
+• All parties notified
+
+👆 SELECT NEXT ACTION:"""
+                            bot.send_message(user_id, result_text, reply_markup=markup)
+                        else:
+                            result_text = f"""❌ REJECTION FAILED
+
+{message_result}
+
+Please try again or contact admin.
+
+👆 SELECT ACTION:"""
+                            bot.send_message(user_id, result_text, reply_markup=markup)
+                    else:
+                        bot.send_message(user_id, "❌ Reason too long (max 200 characters)")
+                
+                # Handle adding comment
+                elif input_type.startswith("add_comment_"):
+                    trade_id = input_type.replace("add_comment_", "")
+                    dealer = session_data.get("dealer")
+                    
+                    if dealer and len(text) <= 200:
+                        success, message_result = add_comment_to_trade(trade_id, dealer['name'], text)
+                        
+                        markup = types.InlineKeyboardMarkup()
+                        markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
+                        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
+                        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
+                        
+                        if success:
+                            result_text = f"""✅ COMMENT ADDED SUCCESSFULLY
+
+{message_result}
+
+📊 SHEET STATUS:
+• Comment added to trade record
+• Visible to all approvers
+• Included in approval history
+
+👆 SELECT NEXT ACTION:"""
+                            bot.send_message(user_id, result_text, reply_markup=markup)
+                        else:
+                            result_text = f"""❌ COMMENT FAILED
+
+{message_result}
+
+Please try again or contact admin.
+
+👆 SELECT ACTION:"""
+                            bot.send_message(user_id, result_text, reply_markup=markup)
+                    else:
+                        bot.send_message(user_id, "❌ Comment too long (max 200 characters)")
+                
+                # FIXED: Handle quantity input - SUPPORTS DECIMALS
+                elif input_type == "quantity" and trade_session:
+                    try:
+                        quantity = float(text)  # CHANGED: Allow decimal quantities
+                        if 0.01 <= quantity <= 10000:  # CHANGED: Allow small decimals
+                            # Calculate total weight based on quantity
+                            weight_per_piece_grams = trade_session.gold_type['weight_grams']
+                            total_weight_grams = quantity * weight_per_piece_grams
+                            total_weight_kg = total_weight_grams / 1000
+                            
+                            trade_session.volume_kg = total_weight_kg
+                            trade_session.volume_grams = total_weight_grams
+                            trade_session.quantity = quantity
+                            trade_session.step = "purity"
+                            
+                            markup = types.InlineKeyboardMarkup()
+                            for purity in GOLD_PURITIES:
+                                markup.add(types.InlineKeyboardButton(
+                                    f"⚖️ {purity['name']}",
+                                    callback_data=f"purity_{purity['value']}"
+                                ))
+                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+                            
+                            # Format quantity display properly for decimals
+                            qty_display = f"{quantity:g}" if quantity == int(quantity) else f"{quantity:.3f}".rstrip('0').rstrip('.')
+                            
+                            bot.send_message(
+                                user_id,
+                                f"""✅ Quantity set: {qty_display} × {trade_session.gold_type['name']}
+✅ Total Weight: {format_weight_combined(total_weight_kg)}
+
+📊 NEW TRADE - STEP 4/8 (PURITY)
+
+⚖️ SELECT PURITY:""",
+                                reply_markup=markup
+                            )
+                        else:
+                            bot.send_message(user_id, "❌ Quantity must be 0.01-10000 pieces")
+                    except ValueError:
+                        bot.send_message(user_id, "❌ Invalid quantity. Enter number like: 2.5")
+                
+                elif input_type == "volume" and trade_session:
+                    volume = safe_float(text)
+                    if 0.001 <= volume <= 1000:
+                        trade_session.volume_kg = volume
+                        trade_session.volume_grams = kg_to_grams(volume)
+                        
+                        markup = types.InlineKeyboardMarkup()
+                        for customer in CUSTOMERS:
+                            markup.add(types.InlineKeyboardButton(
+                                f"👤 {customer}" if customer != "Custom" else f"✏️ {customer}",
+                                callback_data=f"customer_{customer}"
+                            ))
+                        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+                        
+                        volume_oz = grams_to_oz(kg_to_grams(volume))
+                        
+                        bot.send_message(
+                            user_id,
+                            f"✅ Volume set: {format_weight_combined(volume)} = {volume_oz:.2f} troy oz\n\n📊 NEW TRADE - STEP 5/8 (CUSTOMER)\n\n👤 SELECT CUSTOMER:",
+                            reply_markup=markup
+                        )
+                    else:
+                        bot.send_message(user_id, "❌ Volume must be 0.001-1000 KG")
+                
+                elif input_type == "customer" and trade_session:
+                    if len(text) <= 50:
+                        trade_session.customer = text
+                        trade_session.step = "rate_choice"
+                        
+                        current_rate = market_data['gold_usd_oz']
+                        
+                        markup = types.InlineKeyboardMarkup()
+                        markup.add(types.InlineKeyboardButton("📊 Use Market Rate", callback_data="rate_market"))
+                        markup.add(types.InlineKeyboardButton("✏️ Enter Custom Rate", callback_data="rate_custom"))
+                        markup.add(types.InlineKeyboardButton("⚡ Rate Override", callback_data="rate_override"))
+                        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+                        
+                        bot.send_message(
+                            user_id,
+                            f"""✅ Customer: {text}
+
+📊 NEW TRADE - STEP 6/8 (RATE SELECTION)
+
+💰 Current Market: ${current_rate:,.2f} USD/oz
+
+🎯 RATE OPTIONS:
+• 📊 Market Rate: Live rate + premium/discount
+• ✏️ Custom Rate: Your rate + premium/discount  
+• ⚡ Rate Override: Direct final rate
+
+💎 SELECT RATE SOURCE:""",
+                            reply_markup=markup
+                        )
+                    else:
+                        bot.send_message(user_id, "❌ Name too long (max 50)")
+                
+                elif input_type == "custom_rate" and trade_session:
+                    try:
+                        custom_rate = safe_float(text)
+                        if 1000 <= custom_rate <= 10000:
+                            trade_session.rate_per_oz = custom_rate
+                            trade_session.step = "pd_type"
+                            
+                            markup = types.InlineKeyboardMarkup()
+                            markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="pd_premium"))
+                            markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="pd_discount"))
+                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+                            
+                            bot.send_message(
+                                user_id,
+                                f"""✅ Custom Rate Set: ${custom_rate:,.2f}/oz
+
+📊 NEW TRADE - STEP 7/8 (PREMIUM/DISCOUNT)
+
+🎯 SELECT PREMIUM OR DISCOUNT:
+
+💡 Premium = ADD to your rate
+💡 Discount = SUBTRACT from your rate
+
+💎 SELECT TYPE:""",
+                                reply_markup=markup
+                            )
+                        else:
+                            bot.send_message(user_id, "❌ Rate must be between $1,000 - $10,000 per ounce")
+                    except ValueError:
+                        bot.send_message(user_id, "❌ Invalid rate format. Please enter a number (e.g., 2650.00)")
+                
+                elif input_type == "override_rate" and trade_session:
+                    try:
+                        override_rate = safe_float(text)
+                        if 1000 <= override_rate <= 10000:
+                            trade_session.final_rate_per_oz = override_rate
+                            trade_session.step = "confirmation"
+                            
+                            # Skip premium/discount and go directly to confirmation
+                            show_confirmation(None, trade_session, user_id)
+                        else:
+                            bot.send_message(user_id, "❌ Rate must be between $1,000 - $10,000 per ounce")
+                    except ValueError:
+                        bot.send_message(user_id, "❌ Invalid rate format. Please enter a number (e.g., 2650.00)")
+                
+                # FIXED: Handle custom premium/discount amounts
+                elif input_type.startswith("custom_") and trade_session:
+                    pd_type = input_type.replace("custom_", "")  # "premium" or "discount"
+                    try:
+                        pd_amount = safe_float(text)
+                        if 0.01 <= pd_amount <= 500:
+                            trade_session.pd_amount = pd_amount
+                            
+                            # Calculate final rate
+                            if trade_session.rate_type == "market":
+                                base_rate = market_data['gold_usd_oz']
+                            else:  # custom
+                                base_rate = trade_session.rate_per_oz
+                            
+                            if pd_type == "premium":
+                                final_rate = base_rate + pd_amount
+                            else:  # discount
+                                final_rate = base_rate - pd_amount
+                            
+                            trade_session.final_rate_per_oz = final_rate
+                            
+                            # Show trade confirmation
+                            show_confirmation(None, trade_session, user_id)
+                        else:
+                            bot.send_message(user_id, "❌ Amount must be between $0.01 - $500.00 per ounce")
+                    except ValueError:
+                        bot.send_message(user_id, "❌ Invalid amount format. Please enter a number (e.g., 25.50)")
+                
+                del session_data["awaiting_input"]
+                
+            except ValueError:
+                bot.send_message(user_id, "❌ Invalid input")
+            except Exception as e:
+                bot.send_message(user_id, f"❌ Error: {e}")
+        
+    except Exception as e:
+        logger.error(f"❌ Text error: {e}")
+
 # ============================================================================
 # CLOUD-OPTIMIZED MAIN FUNCTION  
 # ============================================================================
 
 def main():
-    """Main function optimized for Railway cloud deployment with IMMEDIATE SAVE + approval workflow"""
+    """Main function optimized for Railway cloud deployment with IMMEDIATE SAVE + approval workflow + DELETE TRADES"""
     try:
         logger.info("=" * 60)
-        logger.info("🥇 GOLD TRADING BOT v4.7 - IMMEDIATE SAVE + APPROVAL WORKFLOW!")
+        logger.info("🥇 GOLD TRADING BOT v4.7 - IMMEDIATE SAVE + APPROVAL WORKFLOW + DELETE!")
         logger.info("=" * 60)
         logger.info("🔧 COMPLETE FEATURES:")
         logger.info("✅ Working gold rate API (2min updates)")
@@ -3870,6 +3889,10 @@ def main():
         logger.info("✅ Instant Telegram notifications")
         logger.info("✅ Color-coded sheets with approval status")
         logger.info("✅ Professional sheet integration")
+        logger.info("🔥 NEW FEATURES:")
+        logger.info("    → Clear sheets also clears approval dashboard")
+        logger.info("    → Admin & Ahmadreza can delete individual trades")
+        logger.info("    → Enhanced sync between sheets and approval system")
         logger.info("✅ 24/7 Cloud Operation")
         logger.info("=" * 60)
         
@@ -3894,7 +3917,7 @@ def main():
         # Give the updater a moment to run
         time.sleep(2)
         
-        logger.info(f"✅ IMMEDIATE SAVE + APPROVAL WORKFLOW BOT v4.7 READY:")
+        logger.info(f"✅ IMMEDIATE SAVE + APPROVAL WORKFLOW + DELETE BOT v4.7 READY:")
         logger.info(f"  💰 Gold: {format_money(market_data['gold_usd_oz'])} | {format_money_aed(market_data['gold_usd_oz'])}")
         logger.info(f"  🇦🇪 UAE Time: {market_data['last_update']}")
         logger.info(f"  📊 Sheets: {'Connected' if sheets_ok else 'Fallback mode'}")
@@ -3902,17 +3925,19 @@ def main():
         logger.info(f"  ✅ Approvers Ready: Abhay, Mushtaq, Ahmadreza")
         logger.info(f"  📲 Telegram Notifications: ACTIVE")
         logger.info(f"  🎨 Color-coded Approval Status: ENABLED")
+        logger.info(f"  🗑️ Delete Individual Trades: ENABLED")
+        logger.info(f"  🧹 Clear Sheets + Approval Sync: ENABLED")
         logger.info(f"  ⚡ All Features: WORKING")
         logger.info(f"  ☁️ Platform: Railway (24/7 operation)")
         
         logger.info(f"📊 Sheet: https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/edit")
-        logger.info("🚀 STARTING IMMEDIATE SAVE + APPROVAL WORKFLOW BOT v4.7 FOR 24/7 OPERATION...")
+        logger.info("🚀 STARTING COMPLETE GOLD TRADING SYSTEM v4.7 FOR 24/7 OPERATION...")
         logger.info("=" * 60)
         
         # Start bot with cloud-optimized polling
         while True:
             try:
-                logger.info("🚀 Starting IMMEDIATE SAVE + APPROVAL WORKFLOW bot v4.7 polling on Railway cloud...")
+                logger.info("🚀 Starting COMPLETE GOLD TRADING bot v4.7 polling on Railway cloud...")
                 bot.infinity_polling(
                     timeout=30, 
                     long_polling_timeout=30,
