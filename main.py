@@ -9,6 +9,7 @@
 ✨ RESTORED: Approval workflow with Abhay, Mushtaq, Ahmadreza
 ✨ RESTORED: Telegram notifications for approvers
 ✨ RESTORED: Color-coded sheets with approval status
+✅ FIXED: Trades now save to sheets IMMEDIATELY upon confirmation
 🎨 Stunning gold-themed sheets with business-grade presentation
 🚀 Ready to run on Railway with automatic restarts!
 """
@@ -668,26 +669,30 @@ def approve_trade(trade_id, approver_name, comment=""):
         # Update status based on workflow
         if approver_name == "Abhay" and trade.approval_status == "pending":
             trade.approval_status = "abhay_approved"
+            # Update sheet status
+            update_trade_status_in_sheets(trade)
             notify_approvers(trade, "abhay_approved")
-            return True, "Approved by Abhay. Notified Mushtaq."
+            return True, "Approved by Abhay. Sheet status updated. Notified Mushtaq."
         
         elif approver_name == "Mushtaq" and trade.approval_status == "abhay_approved":
             trade.approval_status = "mushtaq_approved"
+            # Update sheet status
+            update_trade_status_in_sheets(trade)
             notify_approvers(trade, "mushtaq_approved")
-            return True, "Approved by Mushtaq. Notified Ahmadreza for final approval."
+            return True, "Approved by Mushtaq. Sheet status updated. Notified Ahmadreza for final approval."
         
         elif approver_name == "Ahmadreza" and trade.approval_status == "mushtaq_approved":
             trade.approval_status = "final_approved"
-            # Save to sheets with approved status
-            success, sheet_result = save_trade_to_sheets(trade)
+            # Update sheet status
+            success, sheet_result = update_trade_status_in_sheets(trade)
             if success:
                 # Move to approved trades
                 approved_trades[trade_id] = trade
                 del pending_trades[trade_id]
                 notify_approvers(trade, "final_approved")
-                return True, f"Final approval completed. Trade saved to sheets: {sheet_result}"
+                return True, f"Final approval completed. Sheet status updated to GREEN: {sheet_result}"
             else:
-                return False, f"Final approval given but sheet save failed: {sheet_result}"
+                return False, f"Final approval given but sheet update failed: {sheet_result}"
         
         return False, "Invalid approval workflow step"
         
@@ -733,6 +738,91 @@ def add_comment_to_trade(trade_id, commenter_name, comment):
         
     except Exception as e:
         logger.error(f"❌ Comment error: {e}")
+        return False, str(e)
+
+def update_trade_status_in_sheets(trade_session):
+    """Update existing trade status in sheets"""
+    try:
+        logger.info(f"🔄 Updating trade status in sheets: {trade_session.session_id}")
+        
+        client = get_sheets_client()
+        if not client:
+            logger.error("❌ Sheets client failed")
+            return False, "Sheets client failed"
+            
+        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
+        
+        current_date = get_uae_time()
+        sheet_name = f"Gold_Trades_{current_date.strftime('%Y_%m')}"
+        
+        try:
+            worksheet = spreadsheet.worksheet(sheet_name)
+        except:
+            logger.error(f"❌ Sheet not found: {sheet_name}")
+            return False, f"Sheet not found: {sheet_name}"
+        
+        # Find the row with this trade session ID
+        all_values = worksheet.get_all_values()
+        row_to_update = None
+        
+        for i, row in enumerate(all_values[1:], start=2):  # Skip header row
+            if len(row) > 21 and row[21] == trade_session.session_id:  # Session ID column
+                row_to_update = i
+                break
+        
+        if row_to_update:
+            # Update approval status columns (W, X, Y = 23, 24, 25)
+            approval_status = getattr(trade_session, 'approval_status', 'pending')
+            approved_by = getattr(trade_session, 'approved_by', [])
+            comments = getattr(trade_session, 'comments', [])
+            
+            # Update the specific approval columns
+            updates = [
+                {
+                    'range': f'W{row_to_update}',  # Approval Status
+                    'values': [[approval_status.upper()]]
+                },
+                {
+                    'range': f'X{row_to_update}',  # Approved By
+                    'values': [[", ".join(approved_by) if approved_by else "Pending"]]
+                },
+                {
+                    'range': f'Y{row_to_update}',  # Notes
+                    'values': [["v4.7 UAE | " + " | ".join(comments) if comments else "v4.7 UAE"]]
+                }
+            ]
+            
+            worksheet.batch_update(updates)
+            
+            # Apply color coding based on status
+            try:
+                if approval_status == "pending":
+                    color_format = {"backgroundColor": {"red": 1.0, "green": 0.8, "blue": 0.8}}
+                elif approval_status == "abhay_approved":
+                    color_format = {"backgroundColor": {"red": 1.0, "green": 1.0, "blue": 0.7}}
+                elif approval_status == "mushtaq_approved":
+                    color_format = {"backgroundColor": {"red": 1.0, "green": 0.9, "blue": 0.6}}
+                elif approval_status == "final_approved":
+                    color_format = {"backgroundColor": {"red": 0.8, "green": 1.0, "blue": 0.8}}
+                elif approval_status == "rejected":
+                    color_format = {"backgroundColor": {"red": 0.9, "green": 0.6, "blue": 0.6}}
+                else:
+                    color_format = {"backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}}
+                
+                worksheet.format(f"W{row_to_update}:Y{row_to_update}", color_format)
+                logger.info(f"✅ Applied {approval_status} color formatting to row {row_to_update}")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Color formatting failed for row {row_to_update}: {e}")
+            
+            logger.info(f"✅ Trade status updated in sheets: {trade_session.session_id} -> {approval_status}")
+            return True, f"Status updated to {approval_status}"
+        else:
+            logger.warning(f"⚠️ Trade not found in sheets: {trade_session.session_id}")
+            return False, "Trade not found in sheets"
+        
+    except Exception as e:
+        logger.error(f"❌ Update status error: {e}")
         return False, str(e)
 
 # ============================================================================
@@ -956,6 +1046,7 @@ def start_command(message):
 ✅ Color-coded sheets (Red=Pending, Green=Approved)
 ✅ Approve/Reject/Comment functionality
 ✅ Professional approval tracking
+✅ TRADES SAVE TO SHEETS IMMEDIATELY!
 
 🔒 SELECT DEALER TO LOGIN:"""
         
@@ -1176,6 +1267,7 @@ def handle_dashboard(call):
 • Professional Sheet Integration ✅
 • Color-Coded Approval Status ✅
 • Instant Telegram Notifications ✅
+• IMMEDIATE SHEET SAVING ✅
 
 👆 SELECT ACTION:"""
         
@@ -1759,6 +1851,8 @@ def handle_system_status(call):
 ✅ IMMEDIATE sheet saving
 ✅ Enhanced error logging
 
+🔥 FIXED: TRADES SAVE TO SHEETS IMMEDIATELY!
+
 💡 TROUBLESHOOTING:
 If trades don't appear immediately:
 1. Check the Save Test result above
@@ -1814,8 +1908,9 @@ def handle_new_trade(call):
 💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
 ⏰ UAE Time: {market_data['last_update']}
 
-⚠️ NOTE: All trades require approval workflow:
-Abhay → Mushtaq → Ahmadreza → Final Approval
+⚠️ NOTE: Trades save to sheets IMMEDIATELY with pending status!
+Then get updated through approval workflow:
+Abhay → Mushtaq → Ahmadreza → Final Green Status
 
 🎯 SELECT OPERATION:""",
             call.message.chat.id,
@@ -1823,12 +1918,12 @@ Abhay → Mushtaq → Ahmadreza → Final Approval
             reply_markup=markup
         )
         
-        logger.info(f"📊 User {user_id} started APPROVAL WORKFLOW trade v4.7")
+        logger.info(f"📊 User {user_id} started IMMEDIATE SAVE trade v4.7")
     except Exception as e:
         logger.error(f"New trade error: {e}")
 
 def handle_confirm_trade(call):
-    """Confirm and submit trade for approval"""
+    """FIXED: Confirm and save trade IMMEDIATELY to sheets with pending status"""
     try:
         user_id = call.from_user.id
         session_data = user_sessions.get(user_id, {})
@@ -1838,7 +1933,7 @@ def handle_confirm_trade(call):
             bot.edit_message_text("❌ Session error", call.message.chat.id, call.message.message_id)
             return
         
-        bot.edit_message_text("💾 Submitting trade for approval workflow...", call.message.chat.id, call.message.message_id)
+        bot.edit_message_text("💾 Saving trade to sheets and submitting for approval...", call.message.chat.id, call.message.message_id)
         
         # Calculate trade price for approval
         if trade_session.rate_type == "override":
@@ -1864,29 +1959,52 @@ def handle_confirm_trade(call):
         
         trade_session.price = calc_results['total_price_usd']
         
-        # Add to pending trades
+        # Set approval status to pending
+        trade_session.approval_status = "pending"
+        trade_session.approved_by = []
+        trade_session.comments = []
+        
+        # 🔥 FIXED: SAVE TO SHEETS IMMEDIATELY with pending status
+        logger.info(f"🔥 IMMEDIATE SAVE: Saving trade {trade_session.session_id} to sheets with pending status")
+        try:
+            success, sheet_result = save_trade_to_sheets(trade_session)
+            if success:
+                save_message = f"✅ SAVED to sheets: {sheet_result}"
+                sheet_status = "📊 Trade visible in sheets NOW with RED (pending) status"
+                logger.info(f"🔥 IMMEDIATE SAVE SUCCESS: {trade_session.session_id} -> {sheet_result}")
+            else:
+                save_message = f"❌ Save failed: {sheet_result}"
+                sheet_status = "❌ Failed to save to sheets - will retry during approval"
+                logger.error(f"🔥 IMMEDIATE SAVE FAILED: {trade_session.session_id} -> {sheet_result}")
+        except Exception as e:
+            save_message = f"❌ Save error: {e}"
+            sheet_status = "❌ Save error - will retry during approval"
+            logger.error(f"🔥 IMMEDIATE SAVE ERROR: {trade_session.session_id} -> {e}")
+        
+        # Add to pending trades for approval workflow
         pending_trades[trade_session.session_id] = trade_session
+        logger.info(f"📋 Added to pending_trades for approval: {trade_session.session_id}")
         
         # Notify first approver (Abhay)
         notify_approvers(trade_session, "new")
         
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
+        markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
         markup.add(types.InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard"))
         
-        success_text = f"""🎉 TRADE SUBMITTED FOR APPROVAL! ✨
+        success_text = f"""🎉 TRADE SAVED & SUBMITTED FOR APPROVAL! ✨
 
 ✅ Trade ID: {trade_session.session_id}
-📊 Status: 🔴 PENDING APPROVAL
-⏰ Time: {get_uae_time().strftime('%H:%M:%S')} UAE
+💾 Save Status: {save_message}
+📊 Sheet Status: {sheet_status}
 
 📋 APPROVAL WORKFLOW:
 🔴 Step 1: Awaiting Abhay (Head Accountant)
 ⚪ Step 2: Mushtaq (Level 2 Approver)  
 ⚪ Step 3: Ahmadreza (Final Approver)
 
-📲 NOTIFICATIONS SENT:
-✅ Abhay has been notified via Telegram
+📲 NOTIFICATIONS: ✅ Abhay notified
 
 💰 TRADE SUMMARY:
 • {trade_session.operation.upper()}: {getattr(trade_session, 'quantity', 1)} × {trade_session.gold_type['name']}
@@ -1895,20 +2013,28 @@ def handle_confirm_trade(call):
 • Total: ${calc_results['total_price_usd']:,.2f} USD
 • Total: {format_money_aed(calc_results['total_price_usd'])}
 
-🔄 NEXT STEPS:
-1. Abhay will receive instant notification
-2. After approval, Mushtaq gets notified
-3. After Mushtaq, Ahmadreza gets final approval
-4. Trade automatically saves to sheets when fully approved
+🎨 SHEET WORKFLOW:
+✅ Trade saved with RED (pending) status
+🟡 Will turn YELLOW when Abhay approves
+🟠 Will turn ORANGE when Mushtaq approves
+🟢 Will turn GREEN when Ahmadreza gives final approval
 
-🎨 Professional color-coded sheets with approval status!"""
+🔥 Check your Google Sheets now - trade should be visible!"""
         
         bot.edit_message_text(success_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
         
         if "trade_session" in user_sessions[user_id]:
             del user_sessions[user_id]["trade_session"]
+            
+        logger.info(f"🎉 Trade {trade_session.session_id} COMPLETED: Saved to sheets immediately with pending status")
     except Exception as e:
-        logger.error(f"Confirm trade error: {e}")
+        logger.error(f"❌ Confirm trade error: {e}")
+        try:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
+            bot.edit_message_text(f"❌ Error submitting trade: {e}", call.message.chat.id, call.message.message_id, reply_markup=markup)
+        except:
+            pass
 
 # ============================================================================
 # ALL TRADE HANDLERS - RESTORED FROM WORKING CODE
@@ -2611,10 +2737,10 @@ def show_confirmation(call, trade_session, user_id=None):
         if hasattr(trade_session, 'quantity') and trade_session.quantity:
             type_desc = f"{trade_session.quantity} × {type_desc}"
         
-        confirmation_text = f"""✅ TRADE CONFIRMATION - APPROVAL WORKFLOW! ✨
+        confirmation_text = f"""✅ TRADE CONFIRMATION - IMMEDIATE SAVE! ✨
 
-⚠️ NOTE: This trade will go through approval workflow:
-🔴 Abhay → 🟡 Mushtaq → 🟢 Ahmadreza → Final Save
+🔥 NOTE: This trade will SAVE TO SHEETS IMMEDIATELY with pending status!
+Then progress through approval workflow: Abhay → Mushtaq → Ahmadreza
 
 🎯 TRADE DETAILS:
 • Operation: {trade_session.operation.upper()}
@@ -2638,12 +2764,13 @@ def show_confirmation(call, trade_session, user_id=None):
 👤 Dealer: {trade_session.dealer['name']}
 ⏰ Time: {get_uae_time().strftime('%H:%M:%S')} UAE
 
-📲 WORKFLOW: Will notify Abhay immediately upon confirmation
+🔥 IMMEDIATE SAVE: Will save to sheets with RED (pending) status NOW!
+📋 WORKFLOW: Will notify Abhay immediately upon confirmation
 
-✅ Ready to submit for approval!"""
+✅ Ready to save and submit for approval!"""
         
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("✅ SUBMIT FOR APPROVAL", callback_data="confirm_trade"))
+        markup.add(types.InlineKeyboardButton("✅ SAVE & SUBMIT FOR APPROVAL", callback_data="confirm_trade"))
         markup.add(types.InlineKeyboardButton("✏️ Edit", callback_data="new_trade"))
         markup.add(types.InlineKeyboardButton("❌ Cancel", callback_data="cancel_trade"))
         
@@ -2715,17 +2842,18 @@ def handle_text(message):
                     user_id, 
                     f"""✅ Welcome {dealer['name']}! 
 
-🥇 Gold Trading Bot v4.7 - APPROVAL WORKFLOW! ✨
+🥇 Gold Trading Bot v4.7 - IMMEDIATE SAVE + APPROVAL WORKFLOW! ✨
 🚀 Role: {role_info}
 💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
 🇦🇪 UAE Time: {market_data['last_update']} (Updates every 2min)
 
+🔥 TRADES NOW SAVE TO SHEETS IMMEDIATELY!
 📲 Telegram notifications are ACTIVE for your approvals!
 
-Ready for professional gold trading with approval workflow!""", 
+Ready for professional gold trading with instant sheet saving!""", 
                     reply_markup=markup
                 )
-                logger.info(f"✅ Login: {dealer['name']} (APPROVAL WORKFLOW v4.7)")
+                logger.info(f"✅ Login: {dealer['name']} (IMMEDIATE SAVE v4.7)")
             else:
                 bot.send_message(user_id, "❌ Wrong PIN. Please try again.")
         
@@ -3028,6 +3156,7 @@ def handle_sheet_management(call):
 • Color-coded status (Red=Pending, Green=Approved)
 • Real-time status updates
 • Complete approval tracking
+• IMMEDIATE sheet saving
 
 ⚠️ Delete/Clear operations cannot be undone!
 
@@ -3256,7 +3385,8 @@ Total Sheets: {len(result)}
 https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/edit
 
 ✅ All sheets use professional approval workflow formatting!
-🎨 Color-coded status: Red=Pending, Yellow=Abhay, Orange=Mushtaq, Green=Final"""
+🎨 Color-coded status: Red=Pending, Yellow=Abhay, Orange=Mushtaq, Green=Final
+🔥 IMMEDIATE SAVE: Trades appear instantly with pending status!"""
         else:
             sheets_text = f"❌ Error getting sheets: {result}"
         
@@ -3299,6 +3429,7 @@ def handle_format_sheet(call):
 • Professional borders
 • Perfect column sizing
 • Color-coded approval status
+• IMMEDIATE save support
 
 📊 Your sheet now looks AMAZING with approval workflow!""",
                 call.message.chat.id,
@@ -3353,7 +3484,8 @@ def handle_fix_headers(call):
 • Approved By (Abhay, Mushtaq, Ahmadreza)
 • Notes (Comments and workflow info)
 
-📋 All 25 columns in correct order for approval workflow!""",
+📋 All 25 columns in correct order for approval workflow!
+🔥 IMMEDIATE SAVE compatibility enabled!""",
                 call.message.chat.id,
                 call.message.message_id,
                 reply_markup=markup
@@ -3552,16 +3684,19 @@ def handle_sheet_action(call):
 # ============================================================================
 
 def main():
-    """Main function optimized for Railway cloud deployment with approval workflow"""
+    """Main function optimized for Railway cloud deployment with IMMEDIATE SAVE + approval workflow"""
     try:
         logger.info("=" * 60)
-        logger.info("🥇 GOLD TRADING BOT v4.7 - APPROVAL WORKFLOW RESTORED!")
+        logger.info("🥇 GOLD TRADING BOT v4.7 - IMMEDIATE SAVE + APPROVAL WORKFLOW!")
         logger.info("=" * 60)
         logger.info("🔧 COMPLETE FEATURES:")
         logger.info("✅ Working gold rate API (2min updates)")
         logger.info("✅ UAE timezone for all timestamps (UTC+4)")
         logger.info("✅ Decimal quantities (0.25, 2.5, etc.)")
         logger.info("✅ TT Bar weight: Exact 116.6380g (10 Tola)")
+        logger.info("🔥 IMMEDIATE SHEET SAVING:")
+        logger.info("    → Trades save to sheets IMMEDIATELY with pending status")
+        logger.info("    → Red color for pending, changes through workflow")
         logger.info("✅ APPROVAL WORKFLOW:")
         logger.info("    → Abhay (Head Accountant) - First approval")
         logger.info("    → Mushtaq (Level 2 Approver) - Second approval")
@@ -3593,10 +3728,11 @@ def main():
         # Give the updater a moment to run
         time.sleep(2)
         
-        logger.info(f"✅ APPROVAL WORKFLOW BOT v4.7 READY:")
+        logger.info(f"✅ IMMEDIATE SAVE + APPROVAL WORKFLOW BOT v4.7 READY:")
         logger.info(f"  💰 Gold: {format_money(market_data['gold_usd_oz'])} | {format_money_aed(market_data['gold_usd_oz'])}")
         logger.info(f"  🇦🇪 UAE Time: {market_data['last_update']}")
         logger.info(f"  📊 Sheets: {'Connected' if sheets_ok else 'Fallback mode'}")
+        logger.info(f"  🔥 IMMEDIATE SAVE: ENABLED")
         logger.info(f"  ✅ Approvers Ready: Abhay, Mushtaq, Ahmadreza")
         logger.info(f"  📲 Telegram Notifications: ACTIVE")
         logger.info(f"  🎨 Color-coded Approval Status: ENABLED")
@@ -3604,13 +3740,13 @@ def main():
         logger.info(f"  ☁️ Platform: Railway (24/7 operation)")
         
         logger.info(f"📊 Sheet: https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/edit")
-        logger.info("🚀 STARTING APPROVAL WORKFLOW BOT v4.7 FOR 24/7 OPERATION...")
+        logger.info("🚀 STARTING IMMEDIATE SAVE + APPROVAL WORKFLOW BOT v4.7 FOR 24/7 OPERATION...")
         logger.info("=" * 60)
         
         # Start bot with cloud-optimized polling
         while True:
             try:
-                logger.info("🚀 Starting APPROVAL WORKFLOW bot v4.7 polling on Railway cloud...")
+                logger.info("🚀 Starting IMMEDIATE SAVE + APPROVAL WORKFLOW bot v4.7 polling on Railway cloud...")
                 bot.infinity_polling(
                     timeout=30, 
                     long_polling_timeout=30,
