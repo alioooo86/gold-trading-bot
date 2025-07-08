@@ -806,6 +806,9 @@ def update_trade_status_in_sheets(trade_session):
                     color_format = {"backgroundColor": {"red": 0.8, "green": 1.0, "blue": 0.8}}
                 elif approval_status == "rejected":
                     color_format = {"backgroundColor": {"red": 0.9, "green": 0.6, "blue": 0.6}}
+                elif approval_status == "deleted":
+                    # Dark gray for deleted trades
+                    color_format = {"backgroundColor": {"red": 0.7, "green": 0.7, "blue": 0.7}}
                 else:
                     color_format = {"backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}}
                 
@@ -978,6 +981,9 @@ def save_trade_to_sheets(session):
             elif approval_status == "rejected":
                 # Dark red for rejected
                 color_format = {"backgroundColor": {"red": 0.9, "green": 0.6, "blue": 0.6}}
+            elif approval_status == "deleted":
+                # Dark gray for deleted
+                color_format = {"backgroundColor": {"red": 0.7, "green": 0.7, "blue": 0.7}}
             else:
                 # Default white
                 color_format = {"backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}}
@@ -1090,6 +1096,10 @@ def handle_callbacks(call):
             handle_comment_trade(call)
         elif data.startswith('view_trade_'):
             handle_view_trade(call)
+        elif data.startswith('delete_trade_'):
+            handle_delete_trade_from_dashboard(call)
+        elif data.startswith('confirm_delete_trade_'):
+            handle_confirm_delete_trade(call)
         elif data == 'system_status':
             handle_system_status(call)
         elif data == 'test_save':
@@ -1411,7 +1421,7 @@ def handle_approval_dashboard(call):
         logger.error(f"Approval dashboard error: {e}")
 
 def handle_view_trade(call):
-    """View trade details for approval"""
+    """View trade details for approval with DELETE BUTTON for admin/Ahmadreza"""
     try:
         trade_id = call.data.replace("view_trade_", "")
         
@@ -1469,6 +1479,10 @@ def handle_view_trade(call):
         if 'comment' in permissions:
             markup.add(types.InlineKeyboardButton(f"💬 Add Comment", callback_data=f"comment_{trade_id}"))
         
+        # 🔥 NEW: DELETE BUTTON for admin and Ahmadreza only
+        if 'admin' in permissions or dealer['name'] == 'Ahmadreza':
+            markup.add(types.InlineKeyboardButton(f"🗑️ DELETE TRADE #{trade_id[-4:]}", callback_data=f"delete_trade_{trade_id}"))
+        
         markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="approval_dashboard"))
         
         # Build type description
@@ -1483,6 +1497,11 @@ def handle_view_trade(call):
             "mushtaq_approved": "🟠 MUSHTAQ APPROVED",
             "final_approved": "🟢 FINAL APPROVED"
         }
+        
+        # 🔥 NEW: Show delete permissions
+        delete_permissions = ""
+        if 'admin' in permissions or dealer['name'] == 'Ahmadreza':
+            delete_permissions = f"\n🗑️ DELETE ACCESS: {dealer['name']} can delete this trade"
         
         trade_text = f"""📊 TRADE DETAILS #{trade_id[-8:]}
 
@@ -1509,7 +1528,7 @@ def handle_view_trade(call):
 💬 COMMENTS:
 {chr(10).join(trade.comments) if trade.comments else 'No comments yet'}
 
-🎯 Next Approver: {'Abhay' if trade.approval_status == 'pending' else 'Mushtaq' if trade.approval_status == 'abhay_approved' else 'Ahmadreza' if trade.approval_status == 'mushtaq_approved' else 'Completed'}"""
+🎯 Next Approver: {'Abhay' if trade.approval_status == 'pending' else 'Mushtaq' if trade.approval_status == 'abhay_approved' else 'Ahmadreza' if trade.approval_status == 'mushtaq_approved' else 'Completed'}{delete_permissions}"""
         
         bot.edit_message_text(trade_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     except Exception as e:
@@ -1850,8 +1869,11 @@ def handle_system_status(call):
 ✅ Decimal quantities support
 ✅ IMMEDIATE sheet saving
 ✅ Enhanced error logging
+✅ Admin/Ahmadreza trade deletion
+✅ Clear sheets = clear approval dashboard
 
 🔥 FIXED: TRADES SAVE TO SHEETS IMMEDIATELY!
+🗑️ NEW: Admin/Ahmadreza can delete trades from approval dashboard!
 
 💡 TROUBLESHOOTING:
 If trades don't appear immediately:
@@ -3572,6 +3594,7 @@ Select a sheet to clear:
 • Only data rows will be removed
 • This action cannot be undone
 • Approval workflow history will be lost
+• 🔥 ALSO CLEARS approval dashboard trades
 
 Available sheets with data: {len([s for s in result if s['data_rows'] > 1])}"""
         else:
@@ -3605,7 +3628,7 @@ def delete_sheet(sheet_name):
         return False, str(e)
 
 def clear_sheet(sheet_name, keep_headers=True):
-    """Clear sheet data while optionally keeping headers"""
+    """Clear sheet data while optionally keeping headers + CLEAR APPROVAL DASHBOARD"""
     try:
         client = get_sheets_client()
         if not client:
@@ -3623,21 +3646,164 @@ def clear_sheet(sheet_name, keep_headers=True):
                     range_to_clear = f"A2:Z{len(all_values)}"
                     worksheet.batch_clear([range_to_clear])
                     logger.info(f"✅ Cleared data from sheet: {sheet_name} (kept headers)")
-                    return True, f"Data cleared from '{sheet_name}' (headers preserved)"
+                    
+                    # 🔥 NEW: Also clear pending trades from approval dashboard
+                    if sheet_name.startswith("Gold_Trades_"):
+                        cleared_count = len(pending_trades)
+                        pending_trades.clear()
+                        approved_trades.clear()
+                        logger.info(f"✅ Cleared {cleared_count} trades from approval dashboard")
+                        return True, f"Data cleared from '{sheet_name}' (headers preserved) + {cleared_count} trades removed from approval dashboard"
+                    else:
+                        return True, f"Data cleared from '{sheet_name}' (headers preserved)"
                 else:
                     return True, f"Sheet '{sheet_name}' already empty"
             else:
                 # Clear everything including headers
                 worksheet.clear()
-                logger.info(f"✅ Completely cleared sheet: {sheet_name}")
-                return True, f"Sheet '{sheet_name}' completely cleared"
                 
+                # 🔥 NEW: Also clear pending trades from approval dashboard
+                if sheet_name.startswith("Gold_Trades_"):
+                    cleared_count = len(pending_trades)
+                    pending_trades.clear()
+                    approved_trades.clear()
+                    logger.info(f"✅ Completely cleared sheet + {cleared_count} trades from approval dashboard")
+                    return True, f"Sheet '{sheet_name}' completely cleared + {cleared_count} trades removed from approval dashboard"
+                else:
+                    logger.info(f"✅ Completely cleared sheet: {sheet_name}")
+                    return True, f"Sheet '{sheet_name}' completely cleared"
+                
+def delete_trade_from_dashboard(trade_id, deleter_name):
+    """Delete trade from approval dashboard and update sheets"""
+    try:
+        if trade_id not in pending_trades:
+            return False, "Trade not found in approval dashboard"
+        
+        trade = pending_trades[trade_id]
+        
+        # Mark as deleted in sheets
+        trade.approval_status = "deleted"
+        trade.comments.append(f"DELETED by {deleter_name} from approval dashboard")
+        
+        # Update sheet with deleted status
+        try:
+            success, sheet_result = update_trade_status_in_sheets(trade)
+            if success:
+                logger.info(f"✅ Trade {trade_id} marked as DELETED in sheets")
+            else:
+                logger.warning(f"⚠️ Failed to update sheet for deleted trade {trade_id}: {sheet_result}")
         except Exception as e:
-            return False, f"Sheet '{sheet_name}' not found"
-            
+            logger.error(f"❌ Sheet update error for deleted trade {trade_id}: {e}")
+        
+        # Remove from pending trades
+        del pending_trades[trade_id]
+        logger.info(f"✅ Trade {trade_id} deleted from approval dashboard by {deleter_name}")
+        
+        return True, f"Trade deleted by {deleter_name}. Removed from approval workflow."
+        
     except Exception as e:
-        logger.error(f"❌ Clear sheet error: {e}")
+        logger.error(f"❌ Delete trade error: {e}")
         return False, str(e)
+
+def handle_delete_trade_from_dashboard(call):
+    """Handle deleting trade from approval dashboard - ADMIN/AHMADREZA ONLY"""
+    try:
+        trade_id = call.data.replace("delete_trade_", "")
+        user_id = call.from_user.id
+        session = user_sessions.get(user_id, {})
+        dealer = session.get("dealer")
+        
+        if not dealer:
+            bot.edit_message_text("❌ Please login again", call.message.chat.id, call.message.message_id)
+            return
+        
+        # Check permissions - only admin or Ahmadreza can delete trades
+        permissions = dealer.get('permissions', [])
+        if not ('admin' in permissions or dealer['name'] == 'Ahmadreza'):
+            bot.edit_message_text("❌ Only admin or Ahmadreza can delete trades", call.message.chat.id, call.message.message_id)
+            return
+        
+        if trade_id not in pending_trades:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Approval Dashboard", callback_data="approval_dashboard"))
+            bot.edit_message_text("❌ Trade not found in approval dashboard", call.message.chat.id, call.message.message_id, reply_markup=markup)
+            return
+        
+        trade = pending_trades[trade_id]
+        
+        # Show confirmation
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(f"❌ CONFIRM DELETE #{trade_id[-4:]}", callback_data=f"confirm_delete_trade_{trade_id}"))
+        markup.add(types.InlineKeyboardButton("🔙 Cancel", callback_data=f"view_trade_{trade_id}"))
+        
+        bot.edit_message_text(
+            f"""⚠️ CONFIRM TRADE DELETION
+
+Trade ID: #{trade_id[-8:]}
+Operation: {trade.operation.upper()}
+Customer: {trade.customer}
+Amount: {format_money_aed(trade.price)}
+Status: {trade.approval_status.upper()}
+
+❌ This will:
+• Mark trade as DELETED in sheets
+• Remove from approval workflow
+• Cannot be undone
+
+👤 Deleter: {dealer['name']} ({dealer.get('role', 'Admin')})
+
+⚠️ Are you sure you want to delete this trade?""",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=markup
+        )
+    except Exception as e:
+        logger.error(f"Delete trade handler error: {e}")
+
+def handle_confirm_delete_trade(call):
+    """Handle confirmed trade deletion"""
+    try:
+        trade_id = call.data.replace("confirm_delete_trade_", "")
+        user_id = call.from_user.id
+        session = user_sessions.get(user_id, {})
+        dealer = session.get("dealer")
+        
+        if not dealer:
+            bot.edit_message_text("❌ Please login again", call.message.chat.id, call.message.message_id)
+            return
+        
+        success, message = delete_trade_from_dashboard(trade_id, dealer['name'])
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
+        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
+        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
+        
+        if success:
+            result_text = f"""✅ TRADE DELETED SUCCESSFULLY
+
+{message}
+
+📊 SHEET STATUS:
+• Trade marked as DELETED in sheets
+• Removed from approval dashboard
+• Workflow terminated
+
+👤 Deleted by: {dealer['name']}
+
+👆 SELECT NEXT ACTION:"""
+        else:
+            result_text = f"""❌ DELETION FAILED
+
+{message}
+
+Please try again or contact admin.
+
+👆 SELECT ACTION:"""
+        
+        bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    except Exception as e:
+        logger.error(f"Confirm delete trade error: {e}")
 
 def handle_sheet_action(call):
     """Handle sheet delete/clear actions with full functionality"""
