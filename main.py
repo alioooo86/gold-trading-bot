@@ -578,13 +578,14 @@ class TradeSession:
     def __init__(self, user_id, dealer):
         self.user_id = user_id
         self.dealer = dealer
-        self.session_id = f"TRD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{user_id}"
+        self.session_id = f"TRD-{get_uae_time().strftime('%Y%m%d%H%M%S')}-{user_id}"
         self.reset_trade()
-        # Approval workflow fields
-        self.approval_status = "pending"  # pending, abhay_approved, mushtaq_approved, final_approved, rejected
+        # ENSURE approval workflow fields are initialized
+        self.approval_status = "pending"  # Default status
         self.approved_by = []  # List of approvers
         self.comments = []  # List of comments
-        self.created_at = get_uae_time()
+        self.created_at = get_uae_time()  # UAE timezone
+        logger.info(f"✅ Created TradeSession: {self.session_id} with approval fields initialized")
     
     def reset_trade(self):
         self.step = "operation"
@@ -610,7 +611,8 @@ class TradeSession:
             required = [self.operation, self.gold_type, self.gold_purity, self.volume_kg, self.customer]
             
             if not all(x is not None for x in required):
-                return False, "Missing basic trade information"
+                missing = [str(i) for i, x in enumerate(required) if x is None]
+                return False, f"Missing basic trade information at positions: {missing}"
             
             if safe_float(self.volume_kg) <= 0:
                 return False, "Volume must be greater than 0"
@@ -624,10 +626,23 @@ class TradeSession:
                 if self.rate_type == "custom" and (not self.rate_per_oz or safe_float(self.rate_per_oz) <= 0):
                     return False, "Valid custom rate required"
             
+            # Validate approval workflow fields
+            if not hasattr(self, 'approval_status') or not self.approval_status:
+                self.approval_status = "pending"
+                
+            if not hasattr(self, 'approved_by') or self.approved_by is None:
+                self.approved_by = []
+                
+            if not hasattr(self, 'comments') or self.comments is None:
+                self.comments = []
+                
+            if not hasattr(self, 'created_at') or not self.created_at:
+                self.created_at = get_uae_time()
+            
             return True, "Valid"
         except Exception as e:
             logger.error(f"❌ Validation error: {e}")
-            return False, "Validation failed"
+            return False, f"Validation failed: {e}"
 
 # ============================================================================
 # APPROVAL WORKFLOW FUNCTIONS
@@ -1512,11 +1527,92 @@ def handle_force_refresh_rate(call):
     except Exception as e:
         logger.error(f"Force refresh error: {e}")
 
+def test_immediate_save():
+    """Test function to verify immediate save functionality"""
+    try:
+        logger.info("🔄 Testing immediate save functionality...")
+        
+        # Test sheets connection
+        client = get_sheets_client()
+        if not client:
+            logger.error("❌ Sheets client test failed")
+            return False, "Sheets client failed"
+            
+        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
+        logger.info(f"✅ Connected to spreadsheet: {GOOGLE_SHEET_ID}")
+        
+        # Test sheet creation/access
+        current_date = get_uae_time()
+        sheet_name = f"Gold_Trades_{current_date.strftime('%Y_%m')}"
+        
+        try:
+            worksheet = spreadsheet.worksheet(sheet_name)
+            logger.info(f"✅ Found existing sheet: {sheet_name}")
+        except:
+            logger.info(f"🔄 Creating test sheet: {sheet_name}")
+            worksheet = spreadsheet.add_worksheet(title=sheet_name, rows=1000, cols=25)
+            headers = [
+                'Date', 'Time', 'Dealer', 'Operation', 'Customer', 'Gold Type', 
+                'Volume KG', 'Volume Grams', 'Pure Gold KG', 'Pure Gold Grams', 'Price USD', 'Price AED', 
+                'Input Rate USD', 'Input Rate AED', 'Final Rate USD', 'Final Rate AED', 
+                'Market Rate USD', 'Market Rate AED', 'Purity', 'Rate Type', 'P/D Amount', 'Session ID', 
+                'Approval Status', 'Approved By', 'Notes'
+            ]
+            worksheet.append_row(headers)
+            logger.info(f"✅ Created test sheet with headers")
+        
+        # Test row append
+        test_row = [
+            current_date.strftime('%Y-%m-%d'),
+            current_date.strftime('%H:%M:%S') + ' UAE',
+            'TEST_DEALER',
+            'TEST_OPERATION',
+            'TEST_CUSTOMER',
+            'TEST_TYPE',
+            '1.000 KG',
+            '1,000 grams',
+            '0.999 KG', 
+            '999 grams',
+            '$2,650.00',
+            'AED 9,746.10',
+            '$2,650.00',
+            'AED 9,746.10',
+            '$2,650.00',
+            'AED 9,746.10',
+            '$2,650.00',
+            'AED 9,746.10',
+            '999 (99.9% Pure Gold)',
+            'MARKET',
+            '$0.00',
+            'TEST-SESSION-ID',
+            'PENDING',
+            'Test User',
+            'Test trade for immediate save functionality'
+        ]
+        
+        worksheet.append_row(test_row)
+        row_count = len(worksheet.get_all_values())
+        logger.info(f"✅ Test row added at position: {row_count}")
+        
+        # Test color formatting
+        color_format = {"backgroundColor": {"red": 1.0, "green": 0.8, "blue": 0.8}}
+        worksheet.format(f"W{row_count}:Y{row_count}", color_format)
+        logger.info(f"✅ Test color formatting applied")
+        
+        return True, f"Test successful - sheet: {sheet_name}, row: {row_count}"
+        
+    except Exception as e:
+        logger.error(f"❌ Test failed: {e}")
+        return False, str(e)
+
 def handle_system_status(call):
-    """System status with approval workflow info"""
+    """System status with approval workflow info and SAVE TEST"""
     try:
         sheets_success, sheets_message = test_sheets_connection()
         total_sessions = len(user_sessions)
+        
+        # Test immediate save functionality
+        save_test_success, save_test_message = test_immediate_save()
         
         # Count registered approvers
         registered_approvers = 0
@@ -1542,6 +1638,10 @@ def handle_system_status(call):
 • Google Sheets: {'✅ Connected' if sheets_success else '❌ Failed'}
 • Status: {sheets_message}
 
+🔬 IMMEDIATE SAVE TEST:
+• Save Functionality: {'✅ Working' if save_test_success else '❌ Failed'}
+• Test Result: {save_test_message}
+
 👥 USAGE:
 • Active Sessions: {total_sessions}
 • Pending Trades: {len(pending_trades)}
@@ -1557,12 +1657,20 @@ def handle_system_status(call):
 🆕 v4.7 COMPLETE FEATURES:
 ✅ Sequential approval workflow
 ✅ Instant Telegram notifications
-✅ Color-coded sheets with approval status
+✅ Color-coded approval columns only
 ✅ Approve/Reject/Comment functionality  
 ✅ Working gold rate API (2min updates)
 ✅ UAE timezone for all timestamps
 ✅ Decimal quantities support
-✅ Professional sheet integration"""
+✅ IMMEDIATE sheet saving
+✅ Enhanced error logging
+
+💡 TROUBLESHOOTING:
+If trades don't appear immediately:
+1. Check the Save Test result above
+2. Verify Google Sheets permissions
+3. Check GOOGLE_SHEET_ID variable
+4. Try creating a test trade"""
         
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="system_status"))
