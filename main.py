@@ -2056,7 +2056,7 @@ def handle_fixrate_pd(call):
             markup.add(*row)
         
         markup.add(types.InlineKeyboardButton("✏️ Custom Amount", callback_data=f"fixamount_{pd_type}_custom"))
-                    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fix_rate_{session_data.get('fixing_sheet')}_{session_data.get('fixing_row')}"))
+        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fix_rate_{session_data.get('fixing_sheet')}_{session_data.get('fixing_row')}"))
         
         base_rate = session_data.get("fixing_rate", market_data['gold_usd_oz'])
         
