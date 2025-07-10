@@ -771,6 +771,14 @@ def fix_trade_rate(sheet_name, row_number, pd_type, pd_amount, fixed_by):
         except ValueError as e:
             return False, f"Required column not found: {e}"
         
+        # Helper function to convert column number to letter(s)
+        def col_num_to_letter(n):
+            string = ""
+            while n > 0:
+                n, remainder = divmod(n - 1, 26)
+                string = chr(65 + remainder) + string
+            return string
+        
         # Get rate info from session if available
         user_sessions_list = list(user_sessions.values())
         base_rate = market_data['gold_usd_oz']  # Default to market rate
@@ -798,38 +806,38 @@ def fix_trade_rate(sheet_name, row_number, pd_type, pd_amount, fixed_by):
         current_notes = row_data[notes_col - 1] if len(row_data) >= notes_col else ""
         new_notes = f"{current_notes} | RATE FIXED: {get_uae_time().strftime('%Y-%m-%d %H:%M')} by {fixed_by} - {rate_type_desc} ${base_rate:.2f} {pd_display}"
         
-        # Update the specific cells
+        # Update the specific cells using proper column letters
         updates = [
             {
-                'range': f'{chr(64 + rate_type_col)}{row_number}',  # Rate Type
+                'range': f'{col_num_to_letter(rate_type_col)}{row_number}',  # Rate Type
                 'values': [[f'FIXED-{pd_type.upper()}']]
             },
             {
-                'range': f'{chr(64 + pd_amount_col)}{row_number}',  # P/D Amount
+                'range': f'{col_num_to_letter(pd_amount_col)}{row_number}',  # P/D Amount
                 'values': [[pd_display]]
             },
             {
-                'range': f'{chr(64 + final_rate_usd_col)}{row_number}',  # Final Rate USD
+                'range': f'{col_num_to_letter(final_rate_usd_col)}{row_number}',  # Final Rate USD
                 'values': [[f'${final_rate_usd:,.2f}']]
             },
             {
-                'range': f'{chr(64 + final_rate_aed_col)}{row_number}',  # Final Rate AED
+                'range': f'{col_num_to_letter(final_rate_aed_col)}{row_number}',  # Final Rate AED
                 'values': [[f'AED {final_rate_aed:,.2f}']]
             },
             {
-                'range': f'{chr(64 + rate_fixed_col)}{row_number}',  # Rate Fixed
+                'range': f'{col_num_to_letter(rate_fixed_col)}{row_number}',  # Rate Fixed
                 'values': [['Yes']]
             },
             {
-                'range': f'{chr(64 + notes_col)}{row_number}',  # Notes
+                'range': f'{col_num_to_letter(notes_col)}{row_number}',  # Notes
                 'values': [[new_notes[:500]]]  # Limit notes length
             },
             {
-                'range': f'{chr(64 + fixed_time_col)}{row_number}',  # Fixed Time
+                'range': f'{col_num_to_letter(fixed_time_col)}{row_number}',  # Fixed Time
                 'values': [[get_uae_time().strftime('%Y-%m-%d %H:%M:%S')]]
             },
             {
-                'range': f'{chr(64 + fixed_by_col)}{row_number}',  # Fixed By
+                'range': f'{col_num_to_letter(fixed_by_col)}{row_number}',  # Fixed By
                 'values': [[fixed_by]]
             }
         ]
@@ -1129,16 +1137,36 @@ def save_trade_to_sheets(session):
             rate_description = f"OVERRIDE: ${session.final_rate_per_oz:,.2f}/oz (FINAL)"
             pd_amount_display = "N/A (Override)"
         elif session.rate_type == "unfix":  # Handle unfix rate
-            # For unfix rate, use market rate as placeholder
-            calc_results = calculate_trade_totals_with_override(
-                session.volume_kg,
-                session.gold_purity['value'],
-                market_data['gold_usd_oz'],
-                "unfix"
-            )
+            # For unfix rate, calculate with premium/discount to show preview
             base_rate_usd = market_data['gold_usd_oz']
-            rate_description = f"UNFIX: Rate to be fixed later (Market ref: ${base_rate_usd:,.2f}/oz)"
-            pd_amount_display = "N/A (Unfix)"
+            
+            if hasattr(session, 'pd_type') and hasattr(session, 'pd_amount'):
+                # Calculate preview rate with premium/discount
+                if session.pd_type == "premium":
+                    preview_rate = base_rate_usd + session.pd_amount
+                    pd_amount_display = f"+${session.pd_amount:.2f} (UNFIX)"
+                else:
+                    preview_rate = base_rate_usd - session.pd_amount
+                    pd_amount_display = f"-${session.pd_amount:.2f} (UNFIX)"
+                
+                calc_results = calculate_trade_totals_with_override(
+                    session.volume_kg,
+                    session.gold_purity['value'],
+                    preview_rate,
+                    "unfix"
+                )
+                rate_description = f"UNFIX: Market ${base_rate_usd:.2f} {pd_amount_display}"
+            else:
+                # No premium/discount
+                calc_results = calculate_trade_totals_with_override(
+                    session.volume_kg,
+                    session.gold_purity['value'],
+                    base_rate_usd,
+                    "unfix"
+                )
+                rate_description = f"UNFIX: Rate to be fixed later (Market ref: ${base_rate_usd:,.2f}/oz)"
+                pd_amount_display = "N/A (Unfix)"
+                
             session.rate_fixed_status = "Unfixed"
             session.unfix_time = current_date.strftime('%Y-%m-%d %H:%M:%S')
         else:
@@ -1220,7 +1248,7 @@ def save_trade_to_sheets(session):
             f"${market_rate_usd:,.2f}",
             f"AED {market_rate_aed:,.2f}",
             session.gold_purity['name'],
-            session.rate_type.upper(),
+            "UNFIX" if session.rate_type == "unfix" else session.rate_type.upper(),
             pd_amount_display,
             session.session_id,
             approval_status.upper(),
@@ -1664,7 +1692,7 @@ def handle_fix_rate(call):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("📊 Use Market Rate", callback_data="fixrate_market"))
         markup.add(types.InlineKeyboardButton("✏️ Enter Custom Rate", callback_data="fixrate_custom"))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fixrate_{session.get('fixing_rate_type', 'market')}"))
+        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="fix_unfixed_deals"))
         
         bot.edit_message_text(
             f"""🔧 FIX RATE FOR TRADE
@@ -1912,12 +1940,36 @@ Type your FINAL rate per ounce now:""",
             
         elif choice == "unfix":  # Handle unfix rate
             trade_session.rate_type = "unfix"
-            trade_session.step = "confirmation"
+            trade_session.step = "pd_type"
+            trade_session.rate_per_oz = market_data['gold_usd_oz']  # Use market rate as reference
             trade_session.rate_fixed = False
             trade_session.rate_fixed_status = "Unfixed"
             
-            # Skip premium/discount and go directly to confirmation
-            show_confirmation(call, trade_session)
+            current_spot = market_data['gold_usd_oz']
+            
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="pd_premium"))
+            markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="pd_discount"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
+            
+            bot.edit_message_text(
+                f"""📊 NEW TRADE - STEP 8/9 (PREMIUM/DISCOUNT)
+
+✅ Rate: UNFIX - Market Reference (${current_spot:,.2f}/oz)
+⏰ UAE Time: {market_data['last_update']}
+🔓 This rate will be saved as UNFIXED
+
+🎯 SELECT PREMIUM OR DISCOUNT:
+(This shows what the rate would be, but it will be saved unfixed)
+
+💡 Premium = ADD to rate (when fixed later)
+💡 Discount = SUBTRACT from rate (when fixed later)
+
+💎 SELECT TYPE:""",
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=markup
+            )
             
     except Exception as e:
         logger.error(f"Rate choice error: {e}")
@@ -2004,7 +2056,7 @@ def handle_fixrate_pd(call):
             markup.add(*row)
         
         markup.add(types.InlineKeyboardButton("✏️ Custom Amount", callback_data=f"fixamount_{pd_type}_custom"))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fixrate_{session_data.get('fixing_rate_type', 'market')}"))
+                    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fix_rate_{session_data.get('fixing_sheet')}_{session_data.get('fixing_row')}"))
         
         base_rate = session_data.get("fixing_rate", market_data['gold_usd_oz'])
         
@@ -2986,12 +3038,26 @@ def handle_confirm_trade(call):
                 "override"
             )
         elif trade_session.rate_type == "unfix":
-            calc_results = calculate_trade_totals_with_override(
-                trade_session.volume_kg,
-                trade_session.gold_purity['value'],
-                market_data['gold_usd_oz'],  # Use market rate as reference
-                "unfix"
-            )
+            # For unfix rate, calculate with premium/discount if available
+            base_rate = market_data['gold_usd_oz']
+            if hasattr(trade_session, 'pd_type') and hasattr(trade_session, 'pd_amount'):
+                if trade_session.pd_type == "premium":
+                    preview_rate = base_rate + trade_session.pd_amount
+                else:
+                    preview_rate = base_rate - trade_session.pd_amount
+                calc_results = calculate_trade_totals_with_override(
+                    trade_session.volume_kg,
+                    trade_session.gold_purity['value'],
+                    preview_rate,
+                    "unfix"
+                )
+            else:
+                calc_results = calculate_trade_totals_with_override(
+                    trade_session.volume_kg,
+                    trade_session.gold_purity['value'],
+                    base_rate,
+                    "unfix"
+                )
         else:
             if trade_session.rate_type == "market":
                 base_rate = market_data['gold_usd_oz']
@@ -3171,7 +3237,7 @@ def handle_gold_type(call):
                 markup.add(*row)
             
             markup.add(types.InlineKeyboardButton("✏️ Custom Quantity", callback_data="quantity_custom"))
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"operation_{trade_session.operation}"))
             
             weight_grams = selected_type['weight_grams']
             weight_kg = weight_grams / 1000
@@ -3238,7 +3304,7 @@ def handle_quantity(call):
         if quantity_data == "custom":
             user_sessions[user_id]["awaiting_input"] = "quantity"
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
             
             bot.edit_message_text(
                 f"""🔢 CUSTOM QUANTITY
@@ -3531,14 +3597,32 @@ def show_confirmation(call, trade_session, user_id=None):
             )
             rate_description = f"OVERRIDE: ${trade_session.final_rate_per_oz:,.2f}/oz (FINAL)"
         elif trade_session.rate_type == "unfix":
-            # For unfix rate, use market rate as reference
-            calc_results = calculate_trade_totals_with_override(
-                trade_session.volume_kg,
-                trade_session.gold_purity['value'],
-                market_data['gold_usd_oz'],
-                "unfix"
-            )
-            rate_description = f"UNFIX: Rate to be fixed later (Market ref: ${market_data['gold_usd_oz']:,.2f}/oz)"
+            # For unfix rate, calculate with premium/discount to show what it would be
+            if hasattr(trade_session, 'pd_type') and hasattr(trade_session, 'pd_amount'):
+                base_rate = market_data['gold_usd_oz']
+                if trade_session.pd_type == "premium":
+                    preview_rate = base_rate + trade_session.pd_amount
+                    pd_display = f"+${trade_session.pd_amount:.2f}"
+                else:
+                    preview_rate = base_rate - trade_session.pd_amount
+                    pd_display = f"-${trade_session.pd_amount:.2f}"
+                
+                calc_results = calculate_trade_totals_with_override(
+                    trade_session.volume_kg,
+                    trade_session.gold_purity['value'],
+                    preview_rate,
+                    "unfix"
+                )
+                rate_description = f"UNFIX: Market ${base_rate:.2f} {pd_display}/oz (TO BE FIXED LATER)"
+            else:
+                # No premium/discount selected yet
+                calc_results = calculate_trade_totals_with_override(
+                    trade_session.volume_kg,
+                    trade_session.gold_purity['value'],
+                    market_data['gold_usd_oz'],
+                    "unfix"
+                )
+                rate_description = f"UNFIX: Rate to be fixed later (Market ref: ${market_data['gold_usd_oz']:,.2f}/oz)"
         else:
             if trade_session.rate_type == "market":
                 base_rate = market_data['gold_usd_oz']
@@ -3552,6 +3636,9 @@ def show_confirmation(call, trade_session, user_id=None):
                 trade_session.pd_type,
                 trade_session.pd_amount
             )
+            
+            pd_sign = "+" if trade_session.pd_type == "premium" else "-"
+            rate_description = f"{trade_session.rate_type.upper()}: ${base_rate:,.2f} {pd_sign} ${trade_session.pd_amount}/oz"
             
             pd_sign = "+" if trade_session.pd_type == "premium" else "-"
             rate_description = f"{trade_session.rate_type.upper()}: ${base_rate:,.2f} {pd_sign} ${trade_session.pd_amount}/oz"
