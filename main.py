@@ -2058,7 +2058,7 @@ def handle_pd_type(call):
         elif trade_session.rate_type == "custom":
             markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="rate_custom"))
         else:
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}")))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
         
         base_rate = getattr(trade_session, 'rate_per_oz', market_data['gold_usd_oz'])
         action_desc = "ADDED to" if pd_type == "premium" else "SUBTRACTED from"
