@@ -777,9 +777,9 @@ def fix_trade_rate(sheet_name, row_number, pd_type, pd_amount, fixed_by):
         rate_type_desc = "MARKET"
         
         # Check if we have custom rate info in any session
-        for session in user_sessions_list:
-            if session.get("fixing_sheet") == sheet_name and session.get("fixing_row") == row_number:
-                if session.get("fixing_rate_type") == "custom":
+        for session_data in user_sessions_list:
+            if session_data.get("fixing_sheet") == sheet_name and session_data.get("fixing_row") == row_number:
+                if session_data.get("fixing_rate_type") == "custom":
                     base_rate = session_data.get("fixing_rate", market_data['gold_usd_oz'])
                     rate_type_desc = "CUSTOM"
                 break
@@ -1646,7 +1646,7 @@ Found {len(unfixed_list)} trades with unfixed rates
         logger.error(f"Fix unfixed deals error: {e}")
 
 def handle_fix_rate(call):
-    """Handle fixing rate for a specific trade - WITH RATE CHOICE"""
+    """Handle fixing rate for a specific trade - WITH RATE CHOICE - FIXED"""
     try:
         # Parse sheet name and row number
         parts = call.data.replace("fix_rate_", "").split("_")
@@ -1664,7 +1664,7 @@ def handle_fix_rate(call):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("📊 Use Market Rate", callback_data="fixrate_market"))
         markup.add(types.InlineKeyboardButton("✏️ Enter Custom Rate", callback_data="fixrate_custom"))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fixrate_{session_data.get('fixing_rate_type', 'market')}"))
+        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fixrate_{session.get('fixing_rate_type', 'market')}"))
         
         bot.edit_message_text(
             f"""🔧 FIX RATE FOR TRADE
@@ -1937,7 +1937,7 @@ def handle_fixrate_choice(call):
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="fixpd_premium"))
             markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="fixpd_discount"))
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fixrate_{session_data.get('fixing_rate_type', 'market')}"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fixrate_{session.get('fixing_rate_type', 'market')}"))
             
             bot.edit_message_text(
                 f"""🔧 FIX RATE - PREMIUM/DISCOUNT
@@ -4649,42 +4649,23 @@ Please try again or contact admin.
                             trade_session.rate_per_oz = custom_rate
                             trade_session.step = "pd_type"
                             
-                            # Use the pre-stored pd_type for custom rate flow
-                            pd_type = getattr(trade_session, 'pd_type', 'premium')
-                            
-                            amounts = PREMIUM_AMOUNTS if pd_type == "premium" else DISCOUNT_AMOUNTS
                             markup = types.InlineKeyboardMarkup()
-                            row = []
-                            
-                            for i, amount in enumerate(amounts):
-                                button_text = f"${amount}" if amount > 0 else "0"
-                                row.append(types.InlineKeyboardButton(button_text, callback_data=f"pd_{pd_type}_{amount}"))
-                                if len(row) == 4:
-                                    markup.add(*row)
-                                    row = []
-                            if row:
-                                markup.add(*row)
-                            
-                            markup.add(types.InlineKeyboardButton("✏️ Custom Amount", callback_data=f"pd_{pd_type}_custom"))
+                            markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="pd_premium"))
+                            markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="pd_discount"))
                             markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
-                            
-                            action_desc = "ADDED to" if pd_type == "premium" else "SUBTRACTED from"
-                            sign = "+" if pd_type == "premium" else "-"
                             
                             bot.send_message(
                                 user_id,
                                 f"""✅ Custom Rate Set: ${custom_rate:,.2f}/oz
 
-📊 NEW TRADE - STEP 8/9 (CUSTOM {pd_type.upper()} AMOUNT)
+📊 NEW TRADE - STEP 8/9 (PREMIUM/DISCOUNT)
 
-💎 SELECT {pd_type.upper()} AMOUNT PER OUNCE:
+🎯 SELECT PREMIUM OR DISCOUNT:
 
-💡 This amount will be {action_desc} your custom rate:
-• Custom Rate: ${custom_rate:,.2f}/oz
+💡 Premium = ADD to rate
+💡 Discount = SUBTRACT from rate
 
-💰 EXAMPLE: ${custom_rate:,.2f} {sign} $10 = ${custom_rate + 10 if pd_type == 'premium' else custom_rate - 10:,.2f}/oz
-
-🎯 SELECT {pd_type.upper()} AMOUNT:""",
+💎 SELECT TYPE:""",
                                 reply_markup=markup
                             )
                         else:
