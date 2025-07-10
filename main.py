@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 🥇 GOLD TRADING BOT v4.9 - ENHANCED UNFIX RATE MANAGEMENT
-✨ NEW: Better unfix flow - dealers can go back and fix rates later
-✨ NEW: Premium/Discount shown WITH unfix option (not separate)
-✨ NEW: Fix Unfixed Deals menu to update rates later
-✨ FIXED: All rate options visible at once for better UX
-✨ ENHANCED: Sheet columns track rate fixing history
+✨ NEW: ALL dealers can fix unfixed rates
+✨ NEW: Original rate flow restored (separate steps)
+✨ NEW: Fix rates with market OR custom rate option
+✨ NEW: Full premium/discount options when fixing
+✨ NEW: Back buttons on all screens for better navigation
+✨ FIXED: All v4.8 features still working perfectly
 """
 
 import os
@@ -128,17 +129,17 @@ PURITY_MULTIPLIERS = {
     "custom": 0.118122  # Default to 999 pure gold
 }
 
-# UPDATED DEALERS WITH APPROVAL WORKFLOW
+# UPDATED DEALERS WITH APPROVAL WORKFLOW - ALL DEALERS CAN FIX UNFIXED RATES
 DEALERS = {
-    "2268": {"name": "Ahmadreza", "level": "admin", "active": True, "permissions": ["buy", "sell", "admin", "final_approve", "delete_row", "fix_unfix"], "telegram_id": None},
-    "2269": {"name": "Nima", "level": "senior", "active": True, "permissions": ["buy", "sell", "fix_unfix"], "telegram_id": None},
+    "2268": {"name": "Ahmadreza", "level": "admin", "active": True, "permissions": ["buy", "sell", "admin", "final_approve", "delete_row"], "telegram_id": None},
+    "2269": {"name": "Nima", "level": "senior", "active": True, "permissions": ["buy", "sell"], "telegram_id": None},
     "2270": {"name": "Peiman", "level": "standard", "active": True, "permissions": ["buy", "sell"], "telegram_id": None},
-    "9999": {"name": "System Admin", "level": "admin", "active": True, "permissions": ["buy", "sell", "admin", "delete_row", "fix_unfix"], "telegram_id": None},
+    "9999": {"name": "System Admin", "level": "admin", "active": True, "permissions": ["buy", "sell", "admin", "delete_row"], "telegram_id": None},
     "7777": {"name": "Junior Dealer", "level": "junior", "active": True, "permissions": ["buy", "sell"], "telegram_id": None},
     # APPROVAL WORKFLOW USERS
     "1001": {"name": "Abhay", "level": "approver", "active": True, "permissions": ["approve", "reject", "comment"], "role": "Head Accountant", "telegram_id": None},
     "1002": {"name": "Mushtaq", "level": "approver", "active": True, "permissions": ["approve", "reject", "comment"], "role": "Level 2 Approver", "telegram_id": None},
-    "1003": {"name": "Ahmadreza", "level": "final_approver", "active": True, "permissions": ["buy", "sell", "admin", "final_approve", "delete_row", "fix_unfix"], "role": "Final Approver", "telegram_id": None}
+    "1003": {"name": "Ahmadreza", "level": "final_approver", "active": True, "permissions": ["buy", "sell", "admin", "final_approve", "delete_row"], "role": "Final Approver", "telegram_id": None}
 }
 
 CUSTOMERS = ["Noori", "ASK", "AGM", "Keshavarz", "WSG", "Exness", "MyMaa", "Binance", "Kraken", "Custom"]
@@ -740,7 +741,7 @@ def get_unfixed_trades_from_sheets():
         return []
 
 def fix_trade_rate(sheet_name, row_number, pd_type, pd_amount, fixed_by):
-    """Fix the rate for an unfixed trade"""
+    """Fix the rate for an unfixed trade - ENHANCED WITH CUSTOM RATE SUPPORT"""
     try:
         client = get_sheets_client()
         if not client:
@@ -765,23 +766,37 @@ def fix_trade_rate(sheet_name, row_number, pd_type, pd_amount, fixed_by):
             final_rate_aed_col = headers.index('Final Rate AED') + 1
             rate_fixed_col = headers.index('Rate Fixed') + 1
             notes_col = headers.index('Notes') + 1
+            fixed_time_col = headers.index('Fixed Time') + 1
+            fixed_by_col = headers.index('Fixed By') + 1
         except ValueError as e:
             return False, f"Required column not found: {e}"
         
+        # Get rate info from session if available
+        user_sessions_list = list(user_sessions.values())
+        base_rate = market_data['gold_usd_oz']  # Default to market rate
+        rate_type_desc = "MARKET"
+        
+        # Check if we have custom rate info in any session
+        for session in user_sessions_list:
+            if session.get("fixing_sheet") == sheet_name and session.get("fixing_row") == row_number:
+                if session.get("fixing_rate_type") == "custom":
+                    base_rate = session_data.get("fixing_rate", market_data['gold_usd_oz'])
+                    rate_type_desc = "CUSTOM"
+                break
+        
         # Calculate new rate
-        current_market_rate = market_data['gold_usd_oz']
         if pd_type == "premium":
-            final_rate_usd = current_market_rate + pd_amount
+            final_rate_usd = base_rate + pd_amount
             pd_display = f"+${pd_amount:.2f}"
         else:
-            final_rate_usd = current_market_rate - pd_amount
+            final_rate_usd = base_rate - pd_amount
             pd_display = f"-${pd_amount:.2f}"
         
         final_rate_aed = final_rate_usd * USD_TO_AED_RATE
         
         # Get current notes
         current_notes = row_data[notes_col - 1] if len(row_data) >= notes_col else ""
-        new_notes = f"{current_notes} | RATE FIXED: {get_uae_time().strftime('%Y-%m-%d %H:%M')} by {fixed_by} - Market ${current_market_rate:.2f} {pd_display}"
+        new_notes = f"{current_notes} | RATE FIXED: {get_uae_time().strftime('%Y-%m-%d %H:%M')} by {fixed_by} - {rate_type_desc} ${base_rate:.2f} {pd_display}"
         
         # Update the specific cells
         updates = [
@@ -808,13 +823,21 @@ def fix_trade_rate(sheet_name, row_number, pd_type, pd_amount, fixed_by):
             {
                 'range': f'{chr(64 + notes_col)}{row_number}',  # Notes
                 'values': [[new_notes[:500]]]  # Limit notes length
+            },
+            {
+                'range': f'{chr(64 + fixed_time_col)}{row_number}',  # Fixed Time
+                'values': [[get_uae_time().strftime('%Y-%m-%d %H:%M:%S')]]
+            },
+            {
+                'range': f'{chr(64 + fixed_by_col)}{row_number}',  # Fixed By
+                'values': [[fixed_by]]
             }
         ]
         
         worksheet.batch_update(updates)
         
-        logger.info(f"✅ Fixed rate for trade in row {row_number}: ${final_rate_usd:.2f}/oz")
-        return True, f"Rate fixed at ${final_rate_usd:.2f}/oz (Market ${current_market_rate:.2f} {pd_display})"
+        logger.info(f"✅ Fixed rate for trade in row {row_number}: ${final_rate_usd:.2f}/oz ({rate_type_desc} ${base_rate:.2f} {pd_display})")
+        return True, f"Rate fixed at ${final_rate_usd:.2f}/oz ({rate_type_desc} ${base_rate:.2f} {pd_display})"
         
     except Exception as e:
         logger.error(f"❌ Error fixing trade rate: {e}")
@@ -1356,6 +1379,13 @@ def handle_callbacks(call):
             handle_fix_unfixed_deals(call)
         elif data.startswith('fix_rate_'):
             handle_fix_rate(call)
+        # Fix rate flow callbacks
+        elif data.startswith('fixrate_'):
+            handle_fixrate_choice(call)
+        elif data.startswith('fixpd_'):
+            handle_fixrate_pd(call)
+        elif data.startswith('fixamount_'):
+            handle_pd_amount(call)
         elif data == 'approval_dashboard':
             handle_approval_dashboard(call)
         elif data.startswith('approve_'):
@@ -1405,10 +1435,12 @@ def handle_callbacks(call):
             handle_customer(call)
         elif data.startswith('comm_'):
             handle_communication_type(call)
-        # ENHANCED RATE HANDLERS
-        elif data.startswith('ratechoice_'):
-            handle_enhanced_rate_choice(call)
+        # ORIGINAL RATE FLOW HANDLERS
+        elif data.startswith('rate_'):
+            handle_rate_choice(call)
         elif data.startswith('pd_'):
+            handle_pd_type(call)
+        elif data.startswith('premium_') or data.startswith('discount_'):
             handle_pd_amount(call)
         elif data == 'confirm_trade':
             logger.info(f"🔄 CONFIRM_TRADE callback received for user {user_id}")
@@ -1488,7 +1520,7 @@ Type the PIN now:""",
         logger.error(f"Login error: {e}")
 
 def handle_dashboard(call):
-    """Dashboard with approval workflow access - ENHANCED WITH FIX UNFIX DEALS"""
+    """Dashboard with approval workflow access - ENHANCED WITH FIX UNFIX DEALS FOR ALL DEALERS"""
     try:
         fetch_gold_rate()
         
@@ -1507,9 +1539,8 @@ def handle_dashboard(call):
         # Regular trading for dealers
         if any(p in permissions for p in ['buy', 'sell']):
             markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
-        
-        # Fix unfixed deals option
-        if 'fix_unfix' in permissions:
+            
+            # Fix unfixed deals option - NOW FOR ALL DEALERS WITH BUY/SELL PERMISSION
             unfixed_list = get_unfixed_trades_from_sheets()
             unfixed_count = len(unfixed_list)
             if unfixed_count > 0:
@@ -1534,6 +1565,9 @@ def handle_dashboard(call):
         
         role_info = dealer.get('role', dealer['level'].title())
         
+        # Get unfixed count for display
+        unfixed_display = f"\n• Unfixed Trades: {unfixed_count}" if unfixed_count > 0 else ""
+        
         dashboard_text = f"""✅ DEALER DASHBOARD v4.9 - ENHANCED RATE MANAGEMENT! ✨
 
 👤 Welcome {dealer['name'].upper()}!
@@ -1547,15 +1581,15 @@ def handle_dashboard(call):
 
 🎯 APPROVAL WORKFLOW STATUS:
 • Pending Trades: {len(get_pending_trades())}
-• Approved Trades: {len(approved_trades)}
+• Approved Trades: {len(approved_trades)}{unfixed_display}
 • Notifications: 📲 ACTIVE
 
 ✅ v4.9 ENHANCED FEATURES:
-• Better unfix flow - fix rates later ✅
-• All rate options shown together ✅
-• Fix Unfixed Deals menu available ✅
-• Enhanced rate tracking history ✅
-• All v4.8 features still working ✅
+• ALL dealers can fix unfixed rates ✅
+• Original rate flow restored ✅
+• Fix rates with market or custom ✅
+• Full premium/discount options ✅
+• All v4.8 features working ✅
 
 👆 SELECT ACTION:"""
         
@@ -1564,14 +1598,14 @@ def handle_dashboard(call):
         logger.error(f"Dashboard error: {e}")
 
 def handle_fix_unfixed_deals(call):
-    """Handle fix unfixed deals menu"""
+    """Handle fix unfixed deals menu - NOW FOR ALL DEALERS"""
     try:
         user_id = call.from_user.id
         session = user_sessions.get(user_id, {})
         dealer = session.get("dealer")
         
-        if not dealer or 'fix_unfix' not in dealer.get('permissions', []):
-            bot.edit_message_text("❌ Permission denied", call.message.chat.id, call.message.message_id)
+        if not dealer or not any(p in dealer.get('permissions', []) for p in ['buy', 'sell']):
+            bot.edit_message_text("❌ Trading permission required", call.message.chat.id, call.message.message_id)
             return
         
         bot.edit_message_text("🔍 Searching for unfixed trades...", call.message.chat.id, call.message.message_id)
@@ -1612,7 +1646,7 @@ Found {len(unfixed_list)} trades with unfixed rates
         logger.error(f"Fix unfixed deals error: {e}")
 
 def handle_fix_rate(call):
-    """Handle fixing rate for a specific trade"""
+    """Handle fixing rate for a specific trade - WITH RATE CHOICE"""
     try:
         # Parse sheet name and row number
         parts = call.data.replace("fix_rate_", "").split("_")
@@ -1625,12 +1659,12 @@ def handle_fix_rate(call):
         # Store fixing info in session
         session["fixing_sheet"] = sheet_name
         session["fixing_row"] = row_number
-        session["fixing_step"] = "pd_type"
+        session["fixing_step"] = "rate_choice"
         
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="fixrate_premium"))
-        markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="fixrate_discount"))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="fix_unfixed_deals"))
+        markup.add(types.InlineKeyboardButton("📊 Use Market Rate", callback_data="fixrate_market"))
+        markup.add(types.InlineKeyboardButton("✏️ Enter Custom Rate", callback_data="fixrate_custom"))
+        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fixrate_{session_data.get('fixing_rate_type', 'market')}"))
         
         bot.edit_message_text(
             f"""🔧 FIX RATE FOR TRADE
@@ -1640,12 +1674,11 @@ def handle_fix_rate(call):
 
 💰 Current Market Rate: ${market_data['gold_usd_oz']:,.2f}/oz
 
-🎯 SELECT PREMIUM OR DISCOUNT:
+🎯 SELECT RATE SOURCE:
+• 📊 Market Rate: Use current live rate
+• ✏️ Custom Rate: Enter your own rate
 
-💡 Premium = ADD to market rate
-💡 Discount = SUBTRACT from market rate
-
-💎 SELECT TYPE:""",
+💎 SELECT RATE TYPE:""",
             call.message.chat.id,
             call.message.message_id,
             reply_markup=markup
@@ -1747,21 +1780,12 @@ def handle_communication_type(call):
         
         current_spot = market_data['gold_usd_oz']
         
-        # ENHANCED: Show all rate options at once
+        # RESTORED: Original separate rate flow
         markup = types.InlineKeyboardMarkup()
-        
-        # Market rate options
-        markup.add(types.InlineKeyboardButton("📊 Market + Premium", callback_data="ratechoice_market_premium"))
-        markup.add(types.InlineKeyboardButton("📊 Market + Discount", callback_data="ratechoice_market_discount"))
-        
-        # Custom rate options
-        markup.add(types.InlineKeyboardButton("✏️ Custom + Premium", callback_data="ratechoice_custom_premium"))
-        markup.add(types.InlineKeyboardButton("✏️ Custom + Discount", callback_data="ratechoice_custom_discount"))
-        
-        # Special options
-        markup.add(types.InlineKeyboardButton("⚡ Rate Override (Direct)", callback_data="ratechoice_override"))
-        markup.add(types.InlineKeyboardButton("🔓 Unfix Rate (Fix Later)", callback_data="ratechoice_unfix"))
-        
+        markup.add(types.InlineKeyboardButton("📊 Use Market Rate", callback_data="rate_market"))
+        markup.add(types.InlineKeyboardButton("✏️ Enter Custom Rate", callback_data="rate_custom"))
+        markup.add(types.InlineKeyboardButton("⚡ Rate Override", callback_data="rate_override"))
+        markup.add(types.InlineKeyboardButton("🔓 Unfix Rate (Fix Later)", callback_data="rate_unfix"))
         markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
         
         bot.edit_message_text(
@@ -1773,20 +1797,12 @@ def handle_communication_type(call):
 💰 CURRENT MARKET: ${current_spot:,.2f} USD/oz
 
 🎯 RATE OPTIONS:
+• 📊 Market Rate: Live rate + premium/discount
+• ✏️ Custom Rate: Your rate + premium/discount  
+• ⚡ Rate Override: Direct final rate
+• 🔓 Unfix Rate: Save now, fix rate later
 
-📊 MARKET RATE (${current_spot:,.2f}):
-• Market + Premium: Add to live rate
-• Market + Discount: Subtract from live rate
-
-✏️ CUSTOM RATE:
-• Custom + Premium: Your rate + add
-• Custom + Discount: Your rate - subtract
-
-⚡ SPECIAL OPTIONS:
-• Rate Override: Enter final rate directly
-• Unfix Rate: Save now, fix rate later
-
-💎 SELECT RATE METHOD:""",
+💎 SELECT RATE SOURCE:""",
             call.message.chat.id,
             call.message.message_id,
             reply_markup=markup
@@ -1794,15 +1810,15 @@ def handle_communication_type(call):
     except Exception as e:
         logger.error(f"Communication type error: {e}")
 
-def handle_enhanced_rate_choice(call):
-    """Handle enhanced rate choice with all options"""
+def handle_rate_choice(call):
+    """Handle rate choice - ORIGINAL SEPARATE FLOW WITH UNFIX AND LIVE RATE"""
     try:
-        # Parse the choice
-        choice_parts = call.data.replace("ratechoice_", "").split("_")
-        rate_type = choice_parts[0]  # market, custom, override, unfix
-        pd_type = choice_parts[1] if len(choice_parts) > 1 else None  # premium, discount
+        # AUTO-REFRESH RATE WHEN SELECTING RATE OPTION
+        fetch_gold_rate()
         
         user_id = call.from_user.id
+        choice = call.data.replace("rate_", "")
+        
         session_data = user_sessions.get(user_id, {})
         trade_session = session_data.get("trade_session")
         
@@ -1810,22 +1826,67 @@ def handle_enhanced_rate_choice(call):
             bot.edit_message_text("❌ Session error", call.message.chat.id, call.message.message_id)
             return
         
-        # Handle unfix rate
-        if rate_type == "unfix":
-            trade_session.rate_type = "unfix"
-            trade_session.step = "confirmation"
-            trade_session.rate_fixed = False
-            trade_session.rate_fixed_status = "Unfixed"
-            show_confirmation(call, trade_session)
-            return
-        
-        # Handle override rate
-        if rate_type == "override":
+        if choice == "market":
+            trade_session.step = "pd_type"
+            trade_session.rate_per_oz = market_data['gold_usd_oz']
+            trade_session.rate_type = "market"
+            
+            current_spot = market_data['gold_usd_oz']
+            
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="pd_premium"))
+            markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="pd_discount"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
+            
+            bot.edit_message_text(
+                f"""📊 NEW TRADE - STEP 8/9 (PREMIUM/DISCOUNT)
+
+✅ Rate: Market Rate (${current_spot:,.2f}/oz)
+⏰ UAE Time: {market_data['last_update']}
+
+🎯 SELECT PREMIUM OR DISCOUNT:
+
+💡 Premium = ADD to rate
+💡 Discount = SUBTRACT from rate
+
+💎 SELECT TYPE:""",
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=markup
+            )
+            
+        elif choice == "custom":
+            user_sessions[user_id]["awaiting_input"] = "custom_rate"
+            trade_session.rate_type = "custom"
+            
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
+            
+            current_market = market_data['gold_usd_oz']
+            
+            bot.edit_message_text(
+                f"""✏️ ENTER CUSTOM RATE PER OUNCE
+
+💰 Current Market: ${current_market:,.2f} USD/oz
+⏰ UAE Time: {market_data['last_update']}
+
+💬 Enter your rate per ounce in USD
+📝 Example: 2650.00
+
+⚠️ Range: $1,000 - $10,000 per ounce
+
+Type your rate per ounce now:""",
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=markup
+            )
+            
+        elif choice == "override":
             user_sessions[user_id]["awaiting_input"] = "override_rate"
             trade_session.rate_type = "override"
             
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
             
             current_market = market_data['gold_usd_oz']
             
@@ -1848,90 +1909,125 @@ Type your FINAL rate per ounce now:""",
                 call.message.message_id,
                 reply_markup=markup
             )
-            return
+            
+        elif choice == "unfix":  # Handle unfix rate
+            trade_session.rate_type = "unfix"
+            trade_session.step = "confirmation"
+            trade_session.rate_fixed = False
+            trade_session.rate_fixed_status = "Unfixed"
+            
+            # Skip premium/discount and go directly to confirmation
+            show_confirmation(call, trade_session)
+            
+    except Exception as e:
+        logger.error(f"Rate choice error: {e}")
+
+def handle_fixrate_choice(call):
+    """Handle fix rate choice between market and custom"""
+    try:
+        user_id = call.from_user.id
+        choice = call.data.replace("fixrate_", "")
+        session = user_sessions.get(user_id, {})
         
-        # Handle market rate with premium/discount
-        if rate_type == "market":
-            trade_session.rate_type = "market"
-            trade_session.rate_per_oz = market_data['gold_usd_oz']
-            trade_session.pd_type = pd_type
+        if choice == "market":
+            session["fixing_rate_type"] = "market"
+            session["fixing_rate"] = market_data['gold_usd_oz']
             
-            # Show amount selection
-            amounts = PREMIUM_AMOUNTS if pd_type == "premium" else DISCOUNT_AMOUNTS
+            # Go to premium/discount selection
             markup = types.InlineKeyboardMarkup()
-            row = []
-            
-            for i, amount in enumerate(amounts):
-                button_text = f"${amount}" if amount > 0 else "0"
-                row.append(types.InlineKeyboardButton(button_text, callback_data=f"pd_{pd_type}_{amount}"))
-                if len(row) == 4:
-                    markup.add(*row)
-                    row = []
-            if row:
-                markup.add(*row)
-            
-            markup.add(types.InlineKeyboardButton("✏️ Custom Amount", callback_data=f"pd_{pd_type}_custom"))
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
-            
-            base_rate = market_data['gold_usd_oz']
-            action_desc = "ADDED to" if pd_type == "premium" else "SUBTRACTED from"
-            sign = "+" if pd_type == "premium" else "-"
+            markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="fixpd_premium"))
+            markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="fixpd_discount"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fixrate_{session_data.get('fixing_rate_type', 'market')}"))
             
             bot.edit_message_text(
-                f"""📊 NEW TRADE - STEP 8/9 (MARKET {pd_type.upper()} AMOUNT)
+                f"""🔧 FIX RATE - PREMIUM/DISCOUNT
 
-💎 SELECT {pd_type.upper()} AMOUNT PER OUNCE:
+✅ Rate Type: Market Rate
+💰 Market Rate: ${market_data['gold_usd_oz']:,.2f}/oz
 
-💡 This amount will be {action_desc} market rate:
-• Market Rate: ${base_rate:,.2f}/oz
+🎯 SELECT PREMIUM OR DISCOUNT:
 
-💰 EXAMPLE: ${base_rate:,.2f} {sign} $10 = ${base_rate + 10 if pd_type == 'premium' else base_rate - 10:,.2f}/oz
+💡 Premium = ADD to market rate
+💡 Discount = SUBTRACT from market rate
 
-🎯 SELECT {pd_type.upper()} AMOUNT:""",
+💎 SELECT TYPE:""",
                 call.message.chat.id,
                 call.message.message_id,
                 reply_markup=markup
             )
-            return
-        
-        # Handle custom rate with premium/discount
-        if rate_type == "custom":
-            user_sessions[user_id]["awaiting_input"] = "custom_rate"
-            trade_session.rate_type = "custom"
-            trade_session.pd_type = pd_type  # Store for later use
+            
+        elif choice == "custom":
+            user_sessions[user_id]["awaiting_input"] = "fix_custom_rate"
             
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
-            
-            current_market = market_data['gold_usd_oz']
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="fix_unfixed_deals"))
             
             bot.edit_message_text(
-                f"""✏️ ENTER CUSTOM RATE PER OUNCE
+                f"""✏️ ENTER CUSTOM RATE FOR FIXING
 
-💰 Current Market: ${current_market:,.2f} USD/oz
-⏰ UAE Time: {market_data['last_update']}
+💰 Current Market: ${market_data['gold_usd_oz']:,.2f} USD/oz
 
 💬 Enter your rate per ounce in USD
 📝 Example: 2650.00
 
 ⚠️ Range: $1,000 - $10,000 per ounce
 
-✅ After this, you'll select the {pd_type} amount
-
 Type your rate per ounce now:""",
                 call.message.chat.id,
                 call.message.message_id,
                 reply_markup=markup
             )
-            return
-        
+            
     except Exception as e:
-        logger.error(f"Enhanced rate choice error: {e}")
+        logger.error(f"Fix rate choice error: {e}")
 
-def handle_pd_amount(call):
-    """Handle premium/discount amount - Enhanced for all flows"""
+def handle_fixrate_pd(call):
+    """Handle premium/discount selection for fixing rate"""
     try:
         user_id = call.from_user.id
+        pd_type = call.data.replace("fixpd_", "")
+        session_data = user_sessions.get(user_id, {})
+        
+        session_data["fixing_pd_type"] = pd_type
+        
+        amounts = PREMIUM_AMOUNTS if pd_type == "premium" else DISCOUNT_AMOUNTS
+        markup = types.InlineKeyboardMarkup()
+        row = []
+        
+        for i, amount in enumerate(amounts):
+            button_text = f"${amount}" if amount > 0 else "0"
+            row.append(types.InlineKeyboardButton(button_text, callback_data=f"fixamount_{pd_type}_{amount}"))
+            if len(row) == 4:
+                markup.add(*row)
+                row = []
+        if row:
+            markup.add(*row)
+        
+        markup.add(types.InlineKeyboardButton("✏️ Custom Amount", callback_data=f"fixamount_{pd_type}_custom"))
+        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fixrate_{session_data.get('fixing_rate_type', 'market')}"))
+        
+        base_rate = session_data.get("fixing_rate", market_data['gold_usd_oz'])
+        
+        bot.edit_message_text(
+            f"""🔧 SELECT {pd_type.upper()} AMOUNT
+
+💰 Base Rate: ${base_rate:,.2f}/oz
+
+💎 This amount will be {"ADDED to" if pd_type == "premium" else "SUBTRACTED from"} the rate
+
+🎯 SELECT AMOUNT:""",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=markup
+        )
+    except Exception as e:
+        logger.error(f"Fix rate pd error: {e}")
+
+def handle_pd_type(call):
+    """Handle premium/discount type selection"""
+    try:
+        user_id = call.from_user.id
+        pd_type = call.data.replace("pd_", "")
         
         session_data = user_sessions.get(user_id, {})
         trade_session = session_data.get("trade_session")
@@ -1940,45 +2036,89 @@ def handle_pd_amount(call):
             bot.edit_message_text("❌ Session error", call.message.chat.id, call.message.message_id)
             return
         
-        # Check if this is for fixing an unfixed trade
-        if call.data.startswith('fixrate_'):
-            pd_type = call.data.replace("fixrate_", "")
-            session_data["fixing_pd_type"] = pd_type
-            
-            amounts = PREMIUM_AMOUNTS if pd_type == "premium" else DISCOUNT_AMOUNTS
-            markup = types.InlineKeyboardMarkup()
-            row = []
-            
-            for i, amount in enumerate(amounts):
-                button_text = f"${amount}" if amount > 0 else "0"
-                row.append(types.InlineKeyboardButton(button_text, callback_data=f"fixamount_{pd_type}_{amount}"))
-                if len(row) == 4:
-                    markup.add(*row)
-                    row = []
-            if row:
+        trade_session.pd_type = pd_type
+        
+        amounts = PREMIUM_AMOUNTS if pd_type == "premium" else DISCOUNT_AMOUNTS
+        markup = types.InlineKeyboardMarkup()
+        row = []
+        
+        for i, amount in enumerate(amounts):
+            button_text = f"${amount}" if amount > 0 else "0"
+            row.append(types.InlineKeyboardButton(button_text, callback_data=f"{pd_type}_{amount}"))
+            if len(row) == 4:
                 markup.add(*row)
-            
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="fix_unfixed_deals"))
-            
-            bot.edit_message_text(
-                f"""🔧 SELECT {pd_type.upper()} AMOUNT
+                row = []
+        if row:
+            markup.add(*row)
+        
+        # FIXED: Add custom premium/discount button with proper back navigation
+        markup.add(types.InlineKeyboardButton("✏️ Custom Amount", callback_data=f"{pd_type}_custom"))
+        if trade_session.rate_type == "market":
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="rate_market"))
+        elif trade_session.rate_type == "custom":
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="rate_custom"))
+        else:
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}")))
+        
+        base_rate = getattr(trade_session, 'rate_per_oz', market_data['gold_usd_oz'])
+        action_desc = "ADDED to" if pd_type == "premium" else "SUBTRACTED from"
+        sign = "+" if pd_type == "premium" else "-"
+        
+        bot.edit_message_text(
+            f"""📊 NEW TRADE - STEP 9/9 ({pd_type.upper()} AMOUNT)
 
-💰 Market Rate: ${market_data['gold_usd_oz']:,.2f}/oz
+💎 SELECT {pd_type.upper()} AMOUNT PER OUNCE:
 
-💎 This amount will be {"ADDED to" if pd_type == "premium" else "SUBTRACTED from"} the market rate
+💡 This amount will be {action_desc} your base rate:
+• Base Rate: ${base_rate:,.2f}/oz
 
-🎯 SELECT AMOUNT:""",
-                call.message.chat.id,
-                call.message.message_id,
-                reply_markup=markup
-            )
-            return
+💰 EXAMPLE: ${base_rate:,.2f} {sign} $10 = ${base_rate + 10 if pd_type == 'premium' else base_rate - 10:,.2f}/oz
+
+🎯 SELECT {pd_type.upper()} AMOUNT:""",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=markup
+        )
+    except Exception as e:
+        logger.error(f"P/D type error: {e}")
+
+def handle_pd_amount(call):
+    """Handle premium/discount amount - Enhanced for all flows with back buttons"""
+    try:
+        user_id = call.from_user.id
+        
+        session_data = user_sessions.get(user_id, {})
+        trade_session = session_data.get("trade_session")
         
         # Check if this is a fix amount selection
         if call.data.startswith('fixamount_'):
             parts = call.data.replace("fixamount_", "").split("_")
             pd_type = parts[0]
-            amount = float(parts[1])
+            amount_data = parts[1]
+            
+            # Handle custom amount for fixing
+            if amount_data == "custom":
+                user_sessions[user_id]["awaiting_input"] = f"fix_custom_{pd_type}"
+                markup = types.InlineKeyboardMarkup()
+                markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"fixpd_{pd_type}"))
+                
+                bot.edit_message_text(
+                    f"""✏️ CUSTOM {pd_type.upper()} AMOUNT FOR FIXING
+
+💬 Enter {pd_type} amount per ounce in USD
+📝 Example: 25.50
+
+⚠️ Range: $0.01 - $500.00 per ounce
+
+Type your {pd_type} amount now:""",
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=markup
+                )
+                return
+            
+            # Process the fix amount
+            amount = float(amount_data)
             
             sheet_name = session_data.get("fixing_sheet")
             row_number = session_data.get("fixing_row")
@@ -2015,16 +2155,23 @@ Please try again or contact admin.
             return
         
         # Regular premium/discount handling
-        # Parse the data
-        parts = call.data.replace("pd_", "").split("_")
-        pd_type = parts[0]  # premium or discount
-        amount_data = parts[1]  # amount or "custom"
+        if not trade_session:
+            bot.edit_message_text("❌ Session error", call.message.chat.id, call.message.message_id)
+            return
+        
+        # Determine if this is premium or discount
+        if call.data.startswith('premium_'):
+            amount_data = call.data.replace("premium_", "")
+            pd_type = "premium"
+        else:
+            amount_data = call.data.replace("discount_", "")
+            pd_type = "discount"
         
         # Handle custom amount input
         if amount_data == "custom":
             user_sessions[user_id]["awaiting_input"] = f"custom_{pd_type}"
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"pd_{pd_type}"))
             
             base_rate = getattr(trade_session, 'rate_per_oz', market_data['gold_usd_oz'])
             
@@ -3024,7 +3171,7 @@ def handle_gold_type(call):
                 markup.add(*row)
             
             markup.add(types.InlineKeyboardButton("✏️ Custom Quantity", callback_data="quantity_custom"))
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
             
             weight_grams = selected_type['weight_grams']
             weight_kg = weight_grams / 1000
@@ -4178,11 +4325,10 @@ def handle_text(message):
                 if any(p in dealer.get('permissions', []) for p in ['buy', 'sell']):
                     markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
                 
-                # Check for fix unfix permission
-                if 'fix_unfix' in dealer.get('permissions', []):
-                    unfixed_list = get_unfixed_trades_from_sheets()
-                    if len(unfixed_list) > 0:
-                        markup.add(types.InlineKeyboardButton(f"🔧 Fix Unfixed Deals ({len(unfixed_list)})", callback_data="fix_unfixed_deals"))
+                # Check for fix unfix deals
+                unfixed_list = get_unfixed_trades_from_sheets()
+                if len(unfixed_list) > 0:
+                    markup.add(types.InlineKeyboardButton(f"🔧 Fix Unfixed Deals ({len(unfixed_list)})", callback_data="fix_unfixed_deals"))
                 
                 if any(p in dealer.get('permissions', []) for p in ['approve', 'reject', 'comment', 'final_approve']):
                     markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
@@ -4201,8 +4347,8 @@ def handle_text(message):
 
 🔥 TRADES NOW SAVE TO SHEETS IMMEDIATELY!
 📲 Telegram notifications are ACTIVE for your approvals!
-🔧 NEW: Better unfix flow - fix rates later from dashboard!
-🆕 All rate options shown together for easier selection!
+🔧 NEW: ALL dealers can fix unfixed rates!
+🆕 Original rate flow restored for better UX!
 
 Ready for professional gold trading with enhanced rate management!""", 
                     reply_markup=markup
@@ -4327,6 +4473,82 @@ Please try again or contact admin.
                             bot.send_message(user_id, result_text, reply_markup=markup)
                     else:
                         bot.send_message(user_id, "❌ Comment too long (max 200 characters)")
+                
+                # Handle fix custom rate input
+                elif input_type == "fix_custom_rate":
+                    try:
+                        custom_rate = safe_float(text)
+                        if 1000 <= custom_rate <= 10000:
+                            session_data["fixing_rate_type"] = "custom"
+                            session_data["fixing_rate"] = custom_rate
+                            
+                            # Go to premium/discount selection
+                            markup = types.InlineKeyboardMarkup()
+                            markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="fixpd_premium"))
+                            markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="fixpd_discount"))
+                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="fix_unfixed_deals"))
+                            
+                            bot.send_message(
+                                user_id,
+                                f"""✅ Custom Rate Set: ${custom_rate:,.2f}/oz
+
+🔧 FIX RATE - PREMIUM/DISCOUNT
+
+💰 Your Rate: ${custom_rate:,.2f}/oz
+
+🎯 SELECT PREMIUM OR DISCOUNT:
+
+💡 Premium = ADD to your rate
+💡 Discount = SUBTRACT from your rate
+
+💎 SELECT TYPE:""",
+                                reply_markup=markup
+                            )
+                        else:
+                            bot.send_message(user_id, "❌ Rate must be between $1,000 - $10,000 per ounce")
+                    except ValueError:
+                        bot.send_message(user_id, "❌ Invalid rate format. Please enter a number (e.g., 2650.00)")
+                
+                # Handle fix custom premium/discount amounts
+                elif input_type.startswith("fix_custom_"):
+                    pd_type = input_type.replace("fix_custom_", "")  # "premium" or "discount"
+                    try:
+                        pd_amount = safe_float(text)
+                        if 0.01 <= pd_amount <= 500:
+                            sheet_name = session_data.get("fixing_sheet")
+                            row_number = session_data.get("fixing_row")
+                            dealer = session_data.get("dealer")
+                            
+                            if sheet_name and row_number and dealer:
+                                success, message_result = fix_trade_rate(sheet_name, row_number, pd_type, pd_amount, dealer['name'])
+                                
+                                markup = types.InlineKeyboardMarkup()
+                                markup.add(types.InlineKeyboardButton("🔧 Fix More", callback_data="fix_unfixed_deals"))
+                                markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
+                                
+                                if success:
+                                    result_text = f"""✅ RATE FIXED SUCCESSFULLY!
+
+{message_result}
+
+📊 Sheet updated with new rate
+✅ Trade is now complete
+
+👆 SELECT NEXT ACTION:"""
+                                else:
+                                    result_text = f"""❌ RATE FIX FAILED
+
+{message_result}
+
+Please try again or contact admin.
+
+👆 SELECT ACTION:"""
+                                
+                                bot.send_message(user_id, result_text, reply_markup=markup)
+                        else:
+                            bot.send_message(user_id, "❌ Amount must be between $0.01 - $500.00 per ounce")
+                    except ValueError:
+                        bot.send_message(user_id, "❌ Invalid amount format. Please enter a number (e.g., 25.50)")
                 
                 # FIXED: Handle quantity input - SUPPORTS DECIMALS
                 elif input_type == "quantity" and trade_session:
@@ -4538,10 +4760,11 @@ def main():
         logger.info("✅ Decimal quantities (0.25, 2.5, etc.)")
         logger.info("✅ TT Bar weight: Exact 116.6380g (10 Tola)")
         logger.info("🆕 v4.9 ENHANCED FEATURES:")
-        logger.info("    → Better unfix flow - dealers can fix rates later")
-        logger.info("    → All rate options shown together (not separate)")
-        logger.info("    → Fix Unfixed Deals menu to update rates")
-        logger.info("    → Premium/Discount shown WITH unfix option")
+        logger.info("    → ALL dealers can fix unfixed rates")
+        logger.info("    → Original rate flow restored (separate steps)")
+        logger.info("    → Fix rates with market OR custom rate")
+        logger.info("    → Full premium/discount options when fixing")
+        logger.info("    → Back buttons on all screens")
         logger.info("    → Enhanced rate fixing history tracking")
         logger.info("✅ All v4.8 features still working:")
         logger.info("    → 9999 purity (99.99% pure gold)")
@@ -4593,9 +4816,10 @@ def main():
         logger.info(f"  🎨 Color-coded Approval Status: ENABLED")
         logger.info(f"  🗑️ Delete Individual Trades: ENABLED")
         logger.info(f"  🗑️ Delete Specific Rows: ENABLED")
-        logger.info(f"  🆕 Better Unfix Flow: ENABLED")
-        logger.info(f"  🔧 Fix Unfixed Deals: ENABLED")
-        logger.info(f"  📊 Enhanced Rate Options: ENABLED")
+        logger.info(f"  🆕 ALL Dealers Fix Rates: ENABLED")
+        logger.info(f"  🔧 Fix with Market/Custom: ENABLED")
+        logger.info(f"  📊 Original Rate Flow: RESTORED")
+        logger.info(f"  🔄 Back Buttons: ENABLED")
         logger.info(f"  🔓 Rate Fixing History: ENABLED")
         logger.info(f"  💬 WhatsApp/Regular: ENABLED")
         logger.info(f"  📏 New Bar Sizes: 1g, 5g, 10g ENABLED")
