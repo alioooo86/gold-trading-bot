@@ -1388,7 +1388,7 @@ def handle_callbacks(call):
         # Map all callbacks to their handlers
         callback_handlers = {
             # Core navigation
-            'start': lambda: start_command(call.message),
+            'start': lambda call: start_command(call.message),
             'dashboard': handle_dashboard,
             'show_rate': handle_show_rate,
             'force_refresh_rate': handle_force_refresh_rate,
