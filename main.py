@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-🥇 GOLD TRADING BOT v4.9 - ENHANCED WITH BLOOMBERG TERMINAL STYLING
-✨ FIXED: All back navigation issues resolved
-✨ NEW: Bloomberg Terminal-style sheet formatting
-✨ NEW: Dynamic color gradients and professional styling
+🥇 GOLD TRADING BOT v5.0 - LIGHT BLOOMBERG STYLE WITH FIXES
+✨ FIXED: All back button navigation for approvers
+✨ NEW: Light Bloomberg Terminal styling (no black backgrounds)
+✨ FIXED: Ahmadreza can reject at final stage
+✨ SIMPLIFIED: Single AED rate column showing dealer's chosen rate
 ✨ All existing v4.9 features maintained
 """
 
@@ -137,7 +138,7 @@ DEALERS = {
     # APPROVAL WORKFLOW USERS
     "1001": {"name": "Abhay", "level": "approver", "active": True, "permissions": ["approve", "reject", "comment"], "role": "Head Accountant", "telegram_id": None},
     "1002": {"name": "Mushtaq", "level": "approver", "active": True, "permissions": ["approve", "reject", "comment"], "role": "Level 2 Approver", "telegram_id": None},
-    "1003": {"name": "Ahmadreza", "level": "final_approver", "active": True, "permissions": ["buy", "sell", "admin", "final_approve", "delete_row"], "role": "Final Approver", "telegram_id": None}
+    "1003": {"name": "Ahmadreza", "level": "final_approver", "active": True, "permissions": ["buy", "sell", "admin", "final_approve", "reject", "delete_row"], "role": "Final Approver", "telegram_id": None}
 }
 
 CUSTOMERS = ["Noori", "ASK", "AGM", "Keshavarz", "WSG", "Exness", "MyMaa", "Binance", "Kraken", "Custom"]
@@ -360,7 +361,7 @@ def notify_approvers(trade_session, stage="new"):
 
 ⏰ Time: <b>{get_uae_time().strftime('%Y-%m-%d %H:%M:%S')} UAE</b>
 
-🎯 <b>ACTION NEEDED:</b> Please give final approval to complete this trade.
+🎯 <b>ACTION NEEDED:</b> Please give final approval or reject this trade.
 
 💡 Use /start to access the Approval Dashboard."""
                 send_telegram_notification(ahmadreza_id, message)
@@ -1046,7 +1047,7 @@ def update_trade_status_in_sheets(trade_session):
                 },
                 {
                     'range': f'Y{row_to_update}',  # Notes
-                    'values': [["v4.9 UAE | " + " | ".join(comments) if comments else "v4.9 UAE"]]
+                    'values': [["v5.0 UAE | " + " | ".join(comments) if comments else "v5.0 UAE"]]
                 }
             ]
             
@@ -1084,13 +1085,13 @@ def update_trade_status_in_sheets(trade_session):
         return False, str(e)
 
 # ============================================================================
-# BLOOMBERG TERMINAL STYLE SHEET FORMATTING
+# LIGHT BLOOMBERG TERMINAL STYLE SHEET FORMATTING
 # ============================================================================
 
 def format_sheet_bloomberg_style(worksheet):
-    """🎨 BLOOMBERG TERMINAL STYLE FORMATTING - PROFESSIONAL FINANCIAL DISPLAY"""
+    """🎨 LIGHT BLOOMBERG TERMINAL STYLE FORMATTING - PROFESSIONAL FINANCIAL DISPLAY WITH LIGHT COLORS"""
     try:
-        logger.info(f"🖥️ Applying Bloomberg Terminal styling to: {worksheet.title}")
+        logger.info(f"🖥️ Applying Light Bloomberg Terminal styling to: {worksheet.title}")
         
         # Get sheet data
         all_values = worksheet.get_all_values()
@@ -1100,75 +1101,75 @@ def format_sheet_bloomberg_style(worksheet):
             logger.info("⚠️ Sheet is empty, skipping formatting")
             return
         
-        # 1️⃣ BLOOMBERG-STYLE HEADERS (Orange/Black theme)
+        # 1️⃣ BLOOMBERG-STYLE HEADERS (Orange theme with white background)
         try:
             header_format = {
                 "backgroundColor": {
-                    "red": 1.0,      # Bloomberg Orange
-                    "green": 0.5,
-                    "blue": 0.0
+                    "red": 1.0,      # Light orange background
+                    "green": 0.9,
+                    "blue": 0.8
                 },
                 "textFormat": {
-                    "foregroundColor": {"red": 0.0, "green": 0.0, "blue": 0.0},  # Black text
+                    "foregroundColor": {"red": 0.2, "green": 0.1, "blue": 0.0},  # Dark orange text
                     "fontSize": 11,
                     "bold": True,
-                    "fontFamily": "Courier New"  # Terminal font
+                    "fontFamily": "Consolas"  # Terminal font
                 },
                 "horizontalAlignment": "CENTER",
                 "verticalAlignment": "MIDDLE",
                 "borders": {
-                    "top": {"style": "SOLID", "width": 3, "color": {"red": 0.0, "green": 0.0, "blue": 0.0}},
-                    "bottom": {"style": "SOLID", "width": 3, "color": {"red": 0.0, "green": 0.0, "blue": 0.0}},
-                    "left": {"style": "SOLID", "width": 2, "color": {"red": 0.0, "green": 0.0, "blue": 0.0}},
-                    "right": {"style": "SOLID", "width": 2, "color": {"red": 0.0, "green": 0.0, "blue": 0.0}}
+                    "top": {"style": "SOLID", "width": 3, "color": {"red": 1.0, "green": 0.5, "blue": 0.0}},
+                    "bottom": {"style": "SOLID", "width": 3, "color": {"red": 1.0, "green": 0.5, "blue": 0.0}},
+                    "left": {"style": "SOLID", "width": 2, "color": {"red": 1.0, "green": 0.5, "blue": 0.0}},
+                    "right": {"style": "SOLID", "width": 2, "color": {"red": 1.0, "green": 0.5, "blue": 0.0}}
                 }
             }
             
             worksheet.format("1:1", header_format)
-            logger.info("✅ Bloomberg-style headers applied")
+            logger.info("✅ Light Bloomberg-style headers applied")
             
         except Exception as e:
             logger.info(f"⚠️ Header formatting failed: {e}")
         
-        # 2️⃣ ALTERNATING ROW COLORS (Terminal style)
+        # 2️⃣ ALTERNATING ROW COLORS (Light theme)
         try:
             if row_count > 1:
-                # Dark background for even rows
-                dark_row_format = {
+                # Light blue-gray for even rows
+                even_row_format = {
                     "backgroundColor": {
-                        "red": 0.05,
-                        "green": 0.05,
-                        "blue": 0.05
+                        "red": 0.95,
+                        "green": 0.97,
+                        "blue": 1.0
                     },
                     "textFormat": {
-                        "foregroundColor": {"red": 0.0, "green": 1.0, "blue": 0.4},  # Terminal green
+                        "foregroundColor": {"red": 0.1, "green": 0.1, "blue": 0.2},  # Dark blue text
                         "fontSize": 10,
-                        "fontFamily": "Courier New"
+                        "fontFamily": "Consolas"
                     }
                 }
                 
-                # Slightly lighter for odd rows
-                light_row_format = {
+                # White for odd rows
+                odd_row_format = {
                     "backgroundColor": {
-                        "red": 0.1,
-                        "green": 0.1,
-                        "blue": 0.1
+                        "red": 1.0,
+                        "green": 1.0,
+                        "blue": 1.0
                     },
                     "textFormat": {
-                        "foregroundColor": {"red": 0.0, "green": 0.9, "blue": 0.3},  # Slightly dimmer green
+                        "foregroundColor": {"red": 0.1, "green": 0.1, "blue": 0.1},  # Dark gray text
                         "fontSize": 10,
-                        "fontFamily": "Courier New"
+                        "fontFamily": "Consolas"
                     }
                 }
                 
                 # Apply alternating colors
                 for i in range(2, row_count + 1):
                     if i % 2 == 0:
-                        worksheet.format(f"A{i}:AD{i}", dark_row_format)
+                        worksheet.format(f"A{i}:AD{i}", even_row_format)
                     else:
-                        worksheet.format(f"A{i}:AD{i}", light_row_format)
+                        worksheet.format(f"A{i}:AD{i}", odd_row_format)
                 
-                logger.info("✅ Terminal-style alternating rows applied")
+                logger.info("✅ Light terminal-style alternating rows applied")
                 
         except Exception as e:
             logger.info(f"⚠️ Row formatting failed: {e}")
@@ -1176,33 +1177,29 @@ def format_sheet_bloomberg_style(worksheet):
         # 3️⃣ FINANCIAL DATA FORMATTING (Price columns with special colors)
         try:
             if row_count > 1:
-                # USD Price formatting (Bright cyan for money)
+                # USD Price formatting (Deep blue for money)
                 usd_format = {
                     "numberFormat": {"type": "CURRENCY", "pattern": "$#,##0.00"},
                     "horizontalAlignment": "RIGHT",
                     "textFormat": {
-                        "foregroundColor": {"red": 0.0, "green": 1.0, "blue": 1.0},  # Cyan
+                        "foregroundColor": {"red": 0.0, "green": 0.2, "blue": 0.8},  # Deep blue
                         "bold": True
                     }
                 }
                 worksheet.format(f"K2:K{row_count}", usd_format)  # Price USD
                 worksheet.format(f"M2:M{row_count}", usd_format)  # Input Rate USD  
                 worksheet.format(f"O2:O{row_count}", usd_format)  # Final Rate USD
-                worksheet.format(f"Q2:Q{row_count}", usd_format)  # Market Rate USD
                 
-                # AED Price formatting (Yellow for AED)
+                # AED Price formatting (Rich purple for AED) - SINGLE COLUMN
                 aed_format = {
                     "numberFormat": {"type": "CURRENCY", "pattern": "AED #,##0.00"},
                     "horizontalAlignment": "RIGHT",
                     "textFormat": {
-                        "foregroundColor": {"red": 1.0, "green": 1.0, "blue": 0.0},  # Yellow
+                        "foregroundColor": {"red": 0.5, "green": 0.0, "blue": 0.5},  # Purple
                         "bold": True
                     }
                 }
-                worksheet.format(f"L2:L{row_count}", aed_format)  # Price AED
-                worksheet.format(f"N2:N{row_count}", aed_format)  # Input Rate AED
-                worksheet.format(f"P2:P{row_count}", aed_format)  # Final Rate AED
-                worksheet.format(f"R2:R{row_count}", aed_format)  # Market Rate AED
+                worksheet.format(f"L2:L{row_count}", aed_format)  # Total Price AED (dealer's chosen rate)
                 
                 logger.info("✅ Financial data colors applied")
                 
@@ -1224,16 +1221,18 @@ def format_sheet_bloomberg_style(worksheet):
                             
                             if operation == "BUY":
                                 buy_format = {
+                                    "backgroundColor": {"red": 0.85, "green": 1.0, "blue": 0.85},  # Light green
                                     "textFormat": {
-                                        "foregroundColor": {"red": 0.0, "green": 1.0, "blue": 0.0},  # Bright green
+                                        "foregroundColor": {"red": 0.0, "green": 0.5, "blue": 0.0},  # Dark green
                                         "bold": True
                                     }
                                 }
                                 worksheet.format(f"{col_letter}{i}", buy_format)
                             elif operation == "SELL":
                                 sell_format = {
+                                    "backgroundColor": {"red": 1.0, "green": 0.85, "blue": 0.85},  # Light red
                                     "textFormat": {
-                                        "foregroundColor": {"red": 1.0, "green": 0.0, "blue": 0.0},  # Bright red
+                                        "foregroundColor": {"red": 0.7, "green": 0.0, "blue": 0.0},  # Dark red
                                         "bold": True
                                     }
                                 }
@@ -1244,18 +1243,18 @@ def format_sheet_bloomberg_style(worksheet):
         except Exception as e:
             logger.info(f"⚠️ Operation color coding failed: {e}")
         
-        # 5️⃣ GRID LINES (Terminal style)
+        # 5️⃣ GRID LINES (Light gray style)
         try:
             grid_format = {
                 "borders": {
-                    "top": {"style": "SOLID", "width": 1, "color": {"red": 0.2, "green": 0.2, "blue": 0.2}},
-                    "bottom": {"style": "SOLID", "width": 1, "color": {"red": 0.2, "green": 0.2, "blue": 0.2}},
-                    "left": {"style": "SOLID", "width": 1, "color": {"red": 0.2, "green": 0.2, "blue": 0.2}},
-                    "right": {"style": "SOLID", "width": 1, "color": {"red": 0.2, "green": 0.2, "blue": 0.2}}
+                    "top": {"style": "SOLID", "width": 1, "color": {"red": 0.85, "green": 0.85, "blue": 0.85}},
+                    "bottom": {"style": "SOLID", "width": 1, "color": {"red": 0.85, "green": 0.85, "blue": 0.85}},
+                    "left": {"style": "SOLID", "width": 1, "color": {"red": 0.85, "green": 0.85, "blue": 0.85}},
+                    "right": {"style": "SOLID", "width": 1, "color": {"red": 0.85, "green": 0.85, "blue": 0.85}}
                 }
             }
             worksheet.format(f"A1:AD{row_count}", grid_format)
-            logger.info("✅ Terminal grid lines applied")
+            logger.info("✅ Light grid lines applied")
         except Exception as e:
             logger.info(f"⚠️ Grid formatting failed: {e}")
         
@@ -1270,14 +1269,15 @@ def format_sheet_bloomberg_style(worksheet):
                 ("E:E", 120),    # Customer
                 ("F:F", 150),    # Gold Type
                 ("G:J", 100),    # Volumes
-                ("K:R", 120),    # Prices
-                ("S:S", 100),    # Purity
-                ("T:T", 80),     # Rate Type
-                ("U:U", 100),    # P/D Amount
-                ("V:V", 200),    # Session ID
-                ("W:Y", 150),    # Approval columns
-                ("Z:Z", 100),    # Communication
-                ("AA:AD", 120)   # Rate fixing columns
+                ("K:L", 120),    # Prices (USD and single AED)
+                ("M:P", 0),      # Hide extra rate columns
+                ("Q:Q", 100),    # Purity
+                ("R:R", 80),     # Rate Type
+                ("S:S", 100),    # P/D Amount
+                ("T:T", 200),    # Session ID
+                ("U:W", 150),    # Approval columns
+                ("X:X", 100),    # Communication
+                ("Y:AB", 120)    # Rate fixing columns
             ]
             
             for col_range, width in width_settings:
@@ -1303,14 +1303,14 @@ def format_sheet_bloomberg_style(worksheet):
                             
                             if "OVERRIDE" in rate_type:
                                 override_format = {
-                                    "backgroundColor": {"red": 0.5, "green": 0.0, "blue": 0.5},  # Purple
-                                    "textFormat": {"foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}, "bold": True}
+                                    "backgroundColor": {"red": 0.9, "green": 0.85, "blue": 1.0},  # Light purple
+                                    "textFormat": {"foregroundColor": {"red": 0.4, "green": 0.0, "blue": 0.6}, "bold": True}
                                 }
                                 worksheet.format(f"{col_letter}{i}", override_format)
                             elif "UNFIX" in rate_type:
                                 unfix_format = {
-                                    "backgroundColor": {"red": 0.5, "green": 0.5, "blue": 0.0},  # Dark yellow
-                                    "textFormat": {"foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}, "bold": True}
+                                    "backgroundColor": {"red": 1.0, "green": 0.95, "blue": 0.85},  # Light yellow
+                                    "textFormat": {"foregroundColor": {"red": 0.6, "green": 0.5, "blue": 0.0}, "bold": True}
                                 }
                                 worksheet.format(f"{col_letter}{i}", unfix_format)
                 
@@ -1319,17 +1319,17 @@ def format_sheet_bloomberg_style(worksheet):
         except Exception as e:
             logger.info(f"⚠️ Rate type highlighting failed: {e}")
         
-        logger.info(f"🎉 Bloomberg Terminal styling completed successfully!")
+        logger.info(f"🎉 Light Bloomberg Terminal styling completed successfully!")
         
     except Exception as e:
-        logger.error(f"❌ Bloomberg formatting failed: {e}")
+        logger.error(f"❌ Light Bloomberg formatting failed: {e}")
 
 # ============================================================================
-# ENHANCED SAVE TRADE FUNCTIONS WITH RATE FIXING COLUMNS
+# ENHANCED SAVE TRADE FUNCTIONS WITH SIMPLIFIED AED COLUMN
 # ============================================================================
 
 def save_trade_to_sheets(session):
-    """Save trade to Google Sheets with approval status colors and rate fixing columns"""
+    """Save trade to Google Sheets with approval status colors and simplified AED column"""
     try:
         logger.info(f"🔄 Starting save_trade_to_sheets for {session.session_id}")
         
@@ -1350,17 +1350,16 @@ def save_trade_to_sheets(session):
             logger.info(f"✅ Found existing sheet: {sheet_name}")
         except:
             logger.info(f"🔄 Creating new sheet: {sheet_name}")
-            worksheet = spreadsheet.add_worksheet(title=sheet_name, rows=1000, cols=35)  # Increased columns for rate fixing
+            worksheet = spreadsheet.add_worksheet(title=sheet_name, rows=1000, cols=28)  # Reduced columns
             headers = [
                 'Date', 'Time', 'Dealer', 'Operation', 'Customer', 'Gold Type', 
                 'Volume KG', 'Volume Grams', 'Pure Gold KG', 'Pure Gold Grams', 'Price USD', 'Price AED', 
-                'Input Rate USD', 'Input Rate AED', 'Final Rate USD', 'Final Rate AED', 
-                'Market Rate USD', 'Market Rate AED', 'Purity', 'Rate Type', 'P/D Amount', 'Session ID', 
+                'Final Rate USD', 'Purity', 'Rate Type', 'P/D Amount', 'Session ID', 
                 'Approval Status', 'Approved By', 'Notes', 'Communication', 'Rate Fixed',
-                'Unfixed Time', 'Fixed Time', 'Fixed By'  # NEW columns for rate fixing
+                'Unfixed Time', 'Fixed Time', 'Fixed By'  # Rate fixing columns
             ]
             worksheet.append_row(headers)
-            logger.info(f"✅ Created sheet with enhanced headers: {sheet_name}")
+            logger.info(f"✅ Created sheet with simplified headers: {sheet_name}")
         
         # Calculate using appropriate method based on rate type
         logger.info(f"🔄 Calculating trade totals for rate type: {session.rate_type}")
@@ -1428,16 +1427,11 @@ def save_trade_to_sheets(session):
         
         logger.info(f"✅ Trade calculations completed")
         
-        base_rate_aed = base_rate_usd * USD_TO_AED_RATE
-        
         # Use calculated values
         pure_gold_kg = calc_results['pure_gold_kg']
         total_price_usd = calc_results['total_price_usd']
         total_price_aed = calc_results['total_price_aed']
         final_rate_usd = calc_results.get('final_rate_usd_per_oz', 0)
-        final_rate_aed = final_rate_usd * USD_TO_AED_RATE
-        market_rate_usd = calc_results['market_rate_usd_per_oz']
-        market_rate_aed = calc_results['market_rate_aed_per_oz']
         
         # Build gold type description
         gold_type_desc = session.gold_type['name']
@@ -1452,7 +1446,7 @@ def save_trade_to_sheets(session):
         logger.info(f"🔄 Approval status: {approval_status}")
         
         # Build notes with comments
-        notes_parts = [f"v4.9 UAE: {rate_description}"]
+        notes_parts = [f"v5.0 UAE: {rate_description}"]
         if comments:
             notes_parts.extend(comments)
         notes_text = " | ".join(notes_parts)
@@ -1466,7 +1460,7 @@ def save_trade_to_sheets(session):
         fixed_time = getattr(session, 'fixed_time', '')
         fixed_by = getattr(session, 'fixed_by', '')
         
-        # Row data with enhanced columns - UAE TIME + APPROVAL + RATE FIXING
+        # Row data with simplified columns - SINGLE AED COLUMN
         row_data = [
             current_date.strftime('%Y-%m-%d'),
             current_date.strftime('%H:%M:%S') + ' UAE',  # Add UAE indicator
@@ -1479,13 +1473,8 @@ def save_trade_to_sheets(session):
             f"{pure_gold_kg:.3f} KG",
             f"{pure_gold_kg * 1000:,.0f} grams",
             f"${total_price_usd:,.2f}",
-            f"AED {total_price_aed:,.2f}",
-            f"${base_rate_usd:,.2f}",
-            f"AED {base_rate_aed:,.2f}",
+            f"AED {total_price_aed:,.2f}",  # SINGLE AED COLUMN - dealer's chosen rate
             f"${final_rate_usd:,.2f}",
-            f"AED {final_rate_aed:,.2f}",
-            f"${market_rate_usd:,.2f}",
-            f"AED {market_rate_aed:,.2f}",
             session.gold_purity['name'],
             "UNFIX" if session.rate_type == "unfix" else session.rate_type.upper(),
             pd_amount_display,
@@ -1530,15 +1519,15 @@ def save_trade_to_sheets(session):
                 color_format = {"backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}}
             
             # Apply color to SPECIFIC COLUMNS ONLY (Approval Status, Approved By, Notes)
-            # Columns W, X, Y (23, 24, 25) are the approval-related columns
-            logger.info(f"🔄 Applying color formatting to columns W{row_count}:Y{row_count}")
-            worksheet.format(f"W{row_count}:Y{row_count}", color_format)
+            # Columns R, S, T (18, 19, 20) are the approval-related columns
+            logger.info(f"🔄 Applying color formatting to columns R{row_count}:T{row_count}")
+            worksheet.format(f"R{row_count}:T{row_count}", color_format)
             logger.info(f"✅ Applied {approval_status} color formatting to approval columns only")
             
             # Special formatting for unfixed trades
             if rate_fixed == "No":
                 unfix_format = {"backgroundColor": {"red": 1.0, "green": 0.95, "blue": 0.8}}  # Light orange
-                worksheet.format(f"AA{row_count}", unfix_format)  # Rate Fixed column
+                worksheet.format(f"V{row_count}", unfix_format)  # Rate Fixed column
                 logger.info(f"✅ Applied unfixed rate formatting")
             
         except Exception as e:
@@ -1591,8 +1580,8 @@ def start_command(message):
         
         markup.add(types.InlineKeyboardButton("💰 Live Gold Rate", callback_data="show_rate"))
         
-        welcome_text = f"""🥇 GOLD TRADING BOT v4.9 - BLOOMBERG TERMINAL EDITION! 🖥️
-🚀 Complete Trading System + Professional Terminal Styling
+        welcome_text = f"""🥇 GOLD TRADING BOT v5.0 - LIGHT BLOOMBERG TERMINAL! 🖥️
+🚀 Complete Trading System + Professional Light Terminal Styling
 
 📊 SYSTEM STATUS:
 💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
@@ -1602,21 +1591,18 @@ def start_command(message):
 🔄 Updates: Every 2 minutes
 ☁️ Cloud: Railway Platform (Always On)
 
-🆕 v4.9 ENHANCED FEATURES:
-✅ Bloomberg Terminal-style sheet formatting
-✅ Fixed ALL back navigation issues
-✅ Professional financial data display
-✅ Dynamic color-coded operations
-✅ Better unfix flow - dealers can fix rates later
-✅ All rate options shown together (not separate)
-✅ Fix Unfixed Deals menu to update rates
-✅ Premium/Discount shown WITH unfix option
-✅ Enhanced rate fixing history tracking
+🆕 v5.0 FIXES & FEATURES:
+✅ Fixed ALL back button navigation for approvers
+✅ Light Bloomberg Terminal style (no black backgrounds)
+✅ Ahmadreza can reject at final approval stage
+✅ Simplified to single AED column (dealer's chosen rate)
+✅ Professional light color scheme
+✅ All v4.9 features maintained
 
 🔒 SELECT DEALER TO LOGIN:"""
         
         bot.send_message(message.chat.id, welcome_text, reply_markup=markup)
-        logger.info(f"👤 User {user_id} started ENHANCED bot v4.9")
+        logger.info(f"👤 User {user_id} started ENHANCED bot v5.0")
         
     except Exception as e:
         logger.error(f"❌ Start error: {e}")
@@ -1840,7 +1826,7 @@ def handle_dashboard(call):
         # Get unfixed count for display
         unfixed_display = f"\n• Unfixed Trades: {unfixed_count}" if unfixed_count > 0 else ""
         
-        dashboard_text = f"""✅ DEALER DASHBOARD v4.9 - BLOOMBERG TERMINAL EDITION! 🖥️
+        dashboard_text = f"""✅ DEALER DASHBOARD v5.0 - LIGHT BLOOMBERG TERMINAL! 🖥️
 
 👤 Welcome {dealer['name'].upper()}!
 🔒 Role: {role_info}
@@ -1856,13 +1842,13 @@ def handle_dashboard(call):
 • Approved Trades: {len(approved_trades)}{unfixed_display}
 • Notifications: 📲 ACTIVE
 
-✅ v4.9 ENHANCED FEATURES:
-• Bloomberg Terminal sheet styling 🖥️
-• Fixed ALL back navigation ✅
-• ALL dealers can fix unfixed rates ✅
-• Original rate flow restored ✅
-• Fix rates with market or custom ✅
-• Full premium/discount options ✅
+✅ v5.0 FIXES & FEATURES:
+• Fixed ALL back button navigation ✅
+• Light Bloomberg Terminal styling 🖥️
+• Ahmadreza can reject at final stage ✅
+• Single AED column (dealer's rate) ✅
+• Professional light colors ✅
+• All v4.9 features maintained ✅
 
 👆 SELECT ACTION:"""
         
@@ -2624,19 +2610,23 @@ This indicates a code-level issue with the save function."""
             pass
 
 def handle_approval_dashboard(call):
-    """Approval dashboard for approvers"""
+    """Approval dashboard for approvers - FIXED BACK NAVIGATION"""
     try:
         user_id = call.from_user.id
         session = user_sessions.get(user_id, {})
         dealer = session.get("dealer")
         
         if not dealer:
-            bot.edit_message_text("❌ Please login again", call.message.chat.id, call.message.message_id)
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Login", callback_data="start"))
+            bot.edit_message_text("❌ Please login again", call.message.chat.id, call.message.message_id, reply_markup=markup)
             return
         
         permissions = dealer.get('permissions', [])
         if not any(p in permissions for p in ['approve', 'reject', 'comment', 'final_approve']):
-            bot.edit_message_text("❌ No approval permissions", call.message.chat.id, call.message.message_id)
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
+            bot.edit_message_text("❌ No approval permissions", call.message.chat.id, call.message.message_id, reply_markup=markup)
             return
         
         pending_trades_dict = get_pending_trades()
@@ -2653,7 +2643,7 @@ def handle_approval_dashboard(call):
                 ))
         
         markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="approval_dashboard"))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="dashboard"))
+        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
         
         dashboard_text = f"""✅ APPROVAL DASHBOARD
 
@@ -2673,12 +2663,14 @@ def handle_approval_dashboard(call):
         logger.error(f"Approval dashboard error: {e}")
 
 def handle_view_trade(call):
-    """View trade details for approval WITH DELETE BUTTON FOR ADMIN/AHMADREZA"""
+    """View trade details for approval WITH DELETE BUTTON FOR ADMIN/AHMADREZA AND FIXED REJECT"""
     try:
         trade_id = call.data.replace("view_trade_", "")
         
         if trade_id not in pending_trades:
-            bot.edit_message_text("❌ Trade not found", call.message.chat.id, call.message.message_id)
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="approval_dashboard"))
+            bot.edit_message_text("❌ Trade not found", call.message.chat.id, call.message.message_id, reply_markup=markup)
             return
         
         trade = pending_trades[trade_id]
@@ -2720,15 +2712,19 @@ def handle_view_trade(call):
         
         permissions = dealer.get('permissions', [])
         can_approve = False
+        can_reject = False
         can_delete = False
         
         # Check if user can approve at current stage
         if (dealer['name'] == "Abhay" and trade.approval_status == "pending" and 'approve' in permissions):
             can_approve = True
+            can_reject = True
         elif (dealer['name'] == "Mushtaq" and trade.approval_status == "abhay_approved" and 'approve' in permissions):
             can_approve = True
+            can_reject = True
         elif (dealer['name'] == "Ahmadreza" and trade.approval_status == "mushtaq_approved" and 'final_approve' in permissions):
             can_approve = True
+            can_reject = True  # FIXED: Ahmadreza can reject at final stage
         
         # Check if user can delete (admin or Ahmadreza with final_approve)
         if 'admin' in permissions or 'final_approve' in permissions:
@@ -2737,7 +2733,7 @@ def handle_view_trade(call):
         if can_approve:
             markup.add(types.InlineKeyboardButton(f"✅ Approve #{trade_id[-4:]}", callback_data=f"approve_{trade_id}"))
         
-        if 'reject' in permissions:
+        if can_reject and 'reject' in permissions:
             markup.add(types.InlineKeyboardButton(f"❌ Reject #{trade_id[-4:]}", callback_data=f"reject_{trade_id}"))
         
         if 'comment' in permissions:
@@ -2801,7 +2797,7 @@ def handle_view_trade(call):
 
 🎯 Next Approver: {'Abhay' if trade.approval_status == 'pending' else 'Mushtaq' if trade.approval_status == 'abhay_approved' else 'Ahmadreza' if trade.approval_status == 'mushtaq_approved' else 'Completed'}
 
-🔒 PERMISSIONS: {'Can Delete' if can_delete else 'View Only'}"""
+🔒 PERMISSIONS: {'Can Delete' if can_delete else 'Can Reject' if can_reject else 'View Only'}"""
         
         bot.edit_message_text(trade_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     except Exception as e:
@@ -2906,7 +2902,7 @@ Please try again or contact admin.
         logger.error(f"Approve trade error: {e}")
 
 def handle_reject_trade(call):
-    """Handle trade rejection with enhanced navigation"""
+    """Handle trade rejection with enhanced navigation - FIXED BACK BUTTON"""
     try:
         trade_id = call.data.replace("reject_", "")
         user_id = call.from_user.id
@@ -2921,7 +2917,7 @@ def handle_reject_trade(call):
         user_sessions[user_id]["awaiting_input"] = f"reject_reason_{trade_id}"
         
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="approval_dashboard"))
+        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"view_trade_{trade_id}"))  # FIXED: Back to trade view
         
         bot.edit_message_text(
             f"""❌ REJECT TRADE #{trade_id[-8:]}
@@ -2942,7 +2938,7 @@ Type your rejection reason now:""",
         logger.error(f"Reject trade error: {e}")
 
 def handle_comment_trade(call):
-    """Handle adding comment to trade with enhanced navigation"""
+    """Handle adding comment to trade with enhanced navigation - FIXED BACK BUTTON"""
     try:
         trade_id = call.data.replace("comment_", "")
         user_id = call.from_user.id
@@ -2957,7 +2953,7 @@ def handle_comment_trade(call):
         user_sessions[user_id]["awaiting_input"] = f"add_comment_{trade_id}"
         
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="approval_dashboard"))
+        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"view_trade_{trade_id}"))  # FIXED: Back to trade view
         
         bot.edit_message_text(
             f"""💬 ADD COMMENT TO TRADE #{trade_id[-8:]}
@@ -3084,14 +3080,13 @@ def test_immediate_save():
             logger.info(f"✅ Found existing sheet: {sheet_name}")
         except:
             logger.info(f"🔄 Creating test sheet: {sheet_name}")
-            worksheet = spreadsheet.add_worksheet(title=sheet_name, rows=1000, cols=35)  # Increased columns
+            worksheet = spreadsheet.add_worksheet(title=sheet_name, rows=1000, cols=28)  # Reduced columns
             headers = [
                 'Date', 'Time', 'Dealer', 'Operation', 'Customer', 'Gold Type', 
                 'Volume KG', 'Volume Grams', 'Pure Gold KG', 'Pure Gold Grams', 'Price USD', 'Price AED', 
-                'Input Rate USD', 'Input Rate AED', 'Final Rate USD', 'Final Rate AED', 
-                'Market Rate USD', 'Market Rate AED', 'Purity', 'Rate Type', 'P/D Amount', 'Session ID', 
+                'Final Rate USD', 'Purity', 'Rate Type', 'P/D Amount', 'Session ID', 
                 'Approval Status', 'Approved By', 'Notes', 'Communication', 'Rate Fixed',
-                'Unfixed Time', 'Fixed Time', 'Fixed By'  # NEW columns
+                'Unfixed Time', 'Fixed Time', 'Fixed By'
             ]
             worksheet.append_row(headers)
             logger.info(f"✅ Created test sheet with headers")
@@ -3111,11 +3106,6 @@ def test_immediate_save():
             '$2,650.00',
             'AED 9,746.10',
             '$2,650.00',
-            'AED 9,746.10',
-            '$2,650.00',
-            'AED 9,746.10',
-            '$2,650.00',
-            'AED 9,746.10',
             '9999 (99.99% Pure Gold)',
             'MARKET',
             '$0.00',
@@ -3136,7 +3126,7 @@ def test_immediate_save():
         
         # Test color formatting
         color_format = {"backgroundColor": {"red": 1.0, "green": 0.8, "blue": 0.8}}
-        worksheet.format(f"W{row_count}:Y{row_count}", color_format)
+        worksheet.format(f"R{row_count}:T{row_count}", color_format)
         logger.info(f"✅ Test color formatting applied")
         
         return True, f"Test successful - sheet: {sheet_name}, row: {row_count}"
@@ -3164,7 +3154,7 @@ def handle_system_status(call):
         unfixed_list = get_unfixed_trades_from_sheets()
         unfixed_count = len(unfixed_list)
         
-        status_text = f"""🔧 SYSTEM STATUS v4.9 - BLOOMBERG TERMINAL EDITION! 🖥️
+        status_text = f"""🔧 SYSTEM STATUS v5.0 - LIGHT BLOOMBERG TERMINAL! 🖥️
 
 📊 CORE SYSTEMS:
 • Bot Status: ✅ ONLINE (Railway Cloud)
@@ -3199,15 +3189,13 @@ def handle_system_status(call):
 • Ahmadreza: {'✅' if DEALERS.get('1003', {}).get('telegram_id') else '❌'}
 • Notifications: 📲 ACTIVE
 
-🆕 v4.9 ENHANCED FEATURES:
-✅ Bloomberg Terminal sheet styling 🖥️
-✅ Fixed ALL back navigation issues
-✅ Professional financial display
-✅ Better unfix flow - fix rates later
-✅ All rate options shown together
-✅ Fix Unfixed Deals menu available
-✅ Rate fixing history tracking
-✅ Enhanced sheet columns for fixing
+🆕 v5.0 FIXES & FEATURES:
+✅ Fixed ALL back button navigation
+✅ Light Bloomberg Terminal styling
+✅ Ahmadreza can reject at final stage
+✅ Single AED column (dealer's rate)
+✅ Professional light colors
+✅ All v4.9 features maintained
 🔥 TRADES SAVE TO SHEETS IMMEDIATELY!
 
 💡 TROUBLESHOOTING:
@@ -3275,7 +3263,7 @@ Abhay → Mushtaq → Ahmadreza → Final Green Status
             reply_markup=markup
         )
         
-        logger.info(f"📊 User {user_id} started ENHANCED trade v4.9")
+        logger.info(f"📊 User {user_id} started ENHANCED trade v5.0")
     except Exception as e:
         logger.error(f"New trade error: {e}")
 
@@ -4033,1292 +4021,3 @@ def handle_cancel_trade(call):
         bot.edit_message_text("❌ Trade cancelled", call.message.chat.id, call.message.message_id, reply_markup=markup)
     except Exception as e:
         logger.error(f"Cancel trade error: {e}")
-
-# ============================================================================
-# ENHANCED SHEET MANAGEMENT FUNCTIONS - ADMIN TOOLS WITH CLEAR + DELETE
-# ============================================================================
-
-def handle_sheet_management(call):
-    """Handle sheet management for admin users - FULL FUNCTIONALITY WITH BLOOMBERG"""
-    try:
-        user_id = call.from_user.id
-        session = user_sessions.get(user_id, {})
-        dealer = session.get("dealer")
-        
-        if not dealer or 'admin' not in dealer.get('permissions', []):
-            bot.edit_message_text("❌ Admin access required", call.message.chat.id, call.message.message_id)
-            return
-        
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("📊 View All Sheets", callback_data="view_sheets"))
-        markup.add(types.InlineKeyboardButton("🎨 Format Current Sheet", callback_data="format_sheet"))
-        markup.add(types.InlineKeyboardButton("🖥️ Bloomberg Terminal Format", callback_data="bloomberg_format"))
-        markup.add(types.InlineKeyboardButton("🔧 Fix Headers", callback_data="fix_headers"))
-        markup.add(types.InlineKeyboardButton("🗑️ Delete Sheets", callback_data="delete_sheets"))
-        markup.add(types.InlineKeyboardButton("🧹 Clear Sheet Data", callback_data="clear_sheets"))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="dashboard"))
-        
-        bot.edit_message_text(
-            """🗂️ ADVANCED SHEET MANAGEMENT - ADMIN ACCESS
-
-🎨 PROFESSIONAL FORMATTING TOOLS:
-• View All Sheets: See spreadsheet overview
-• Format Current Sheet: Apply beautiful gold formatting
-• Bloomberg Terminal Format: Professional financial display 🖥️
-• Fix Headers: Ensure proper column headers  
-• Delete Sheets: Remove unwanted sheets permanently
-• Clear Sheet Data: Remove data while keeping headers
-
-🖥️ BLOOMBERG TERMINAL FEATURES:
-• Professional black/orange/green theme
-• Financial data highlighting
-• Buy/Sell color coding
-• Dynamic row alternating
-• Terminal-style fonts
-
-✅ APPROVAL WORKFLOW FEATURES:
-• Color-coded status (Red=Pending, Green=Approved)
-• Real-time status updates
-• Complete approval tracking
-• IMMEDIATE sheet saving
-
-🔥 NEW: Clear options now sync with approval dashboard
-• Clear sheet only (approval dashboard remains)
-• Clear approval dashboard only (sheets remain)
-• Clear both sheets AND approval dashboard
-
-⚠️ Delete/Clear operations cannot be undone!
-
-👆 SELECT ACTION:""",
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=markup
-        )
-    except Exception as e:
-        logger.error(f"Sheet management error: {e}")
-
-def handle_bloomberg_format(call):
-    """Handle Bloomberg Terminal format application"""
-    try:
-        bot.edit_message_text("🖥️ Applying Bloomberg Terminal formatting...", call.message.chat.id, call.message.message_id)
-        
-        client = get_sheets_client()
-        if not client:
-            bot.edit_message_text("❌ Sheets connection failed", call.message.chat.id, call.message.message_id)
-            return
-        
-        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
-        current_month = get_uae_time().strftime('%Y_%m')
-        sheet_name = f"Gold_Trades_{current_month}"
-        
-        try:
-            worksheet = spreadsheet.worksheet(sheet_name)
-            format_sheet_bloomberg_style(worksheet)
-            
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-            
-            bot.edit_message_text(
-                f"""🎉 BLOOMBERG TERMINAL FORMATTING APPLIED! 🖥️
-
-✅ Sheet: {sheet_name}
-🖥️ Applied professional financial terminal styling:
-• Bloomberg orange/black headers
-• Terminal green text on dark background
-• Buy/Sell color coding (green/red)
-• Financial data highlighting (cyan USD, yellow AED)
-• Rate type indicators (purple override, yellow unfix)
-• Professional grid lines
-• Alternating dark rows
-
-📊 Your sheet now looks like a PROFESSIONAL TRADING TERMINAL!
-
-💡 Features:
-• Easy to read in low light
-• Clear financial data separation
-• Instant buy/sell identification
-• Professional appearance""",
-                call.message.chat.id,
-                call.message.message_id,
-                reply_markup=markup
-            )
-        except Exception as e:
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-            
-            bot.edit_message_text(
-                f"❌ Sheet not found: {sheet_name}\n\nCreate a trade first to generate the sheet.",
-                call.message.chat.id,
-                call.message.message_id,
-                reply_markup=markup
-            )
-    except Exception as e:
-        logger.error(f"Bloomberg format error: {e}")
-
-def get_all_sheets():
-    """Get all sheets in the spreadsheet"""
-    try:
-        client = get_sheets_client()
-        if not client:
-            return False, "Client connection failed"
-            
-        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
-        worksheets = spreadsheet.worksheets()
-        
-        sheet_info = []
-        for sheet in worksheets:
-            try:
-                row_count = sheet.row_count
-                col_count = sheet.col_count
-                all_values = sheet.get_all_values()
-                data_rows = len([row for row in all_values if any(cell.strip() for cell in row)])
-                
-                sheet_info.append({
-                    'name': sheet.title,
-                    'id': sheet.id,
-                    'row_count': row_count,
-                    'col_count': col_count,
-                    'data_rows': data_rows,
-                    'updated': getattr(sheet, 'updated', 'Unknown')
-                })
-            except Exception as e:
-                logger.error(f"Error getting sheet info for {sheet.title}: {e}")
-                sheet_info.append({
-                    'name': sheet.title,
-                    'id': getattr(sheet, 'id', 'Unknown'),
-                    'row_count': 'Unknown',
-                    'col_count': 'Unknown',
-                    'data_rows': 'Unknown',
-                    'updated': 'Unknown'
-                })
-        
-        return True, sheet_info
-        
-    except Exception as e:
-        logger.error(f"Error getting sheets: {e}")
-        return False, str(e)
-
-def format_sheet_beautifully(worksheet):
-    """🎨 PROFESSIONAL SHEET FORMATTING - AMAZING RESULTS!"""
-    try:
-        logger.info(f"🎨 Starting PROFESSIONAL formatting for: {worksheet.title}")
-        
-        # Get sheet data
-        all_values = worksheet.get_all_values()
-        row_count = len(all_values)
-        
-        if row_count < 1:
-            logger.info("⚠️ Sheet is empty, skipping formatting")
-            return
-        
-        # 1️⃣ STUNNING GOLD HEADERS
-        try:
-            header_format = {
-                "backgroundColor": {
-                    "red": 0.85,    # Rich gold background ✨
-                    "green": 0.65,
-                    "blue": 0.125
-                },
-                "textFormat": {
-                    "foregroundColor": {"red": 0.2, "green": 0.2, "blue": 0.2},  # Dark text
-                    "fontSize": 12,
-                    "bold": True,
-                    "fontFamily": "Roboto"
-                },
-                "horizontalAlignment": "CENTER",
-                "verticalAlignment": "MIDDLE",
-                "borders": {
-                    "top": {"style": "SOLID", "width": 2, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}},
-                    "bottom": {"style": "SOLID", "width": 2, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}},
-                    "left": {"style": "SOLID", "width": 1, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}},
-                    "right": {"style": "SOLID", "width": 1, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}}
-                }
-            }
-            
-            worksheet.format("1:1", header_format)
-            logger.info("✅ STUNNING gold headers applied")
-            
-        except Exception as e:
-            logger.info(f"⚠️ Header formatting failed: {e}")
-        
-        # 2️⃣ SMART CURRENCY FORMATTING
-        try:
-            if row_count > 1:
-                # USD Currency formatting
-                usd_format = {
-                    "numberFormat": {"type": "CURRENCY", "pattern": "$#,##0.00"},
-                    "horizontalAlignment": "RIGHT"
-                }
-                worksheet.format(f"K2:K{row_count}", usd_format)  # Price USD
-                worksheet.format(f"M2:M{row_count}", usd_format)  # Input Rate USD  
-                worksheet.format(f"O2:O{row_count}", usd_format)  # Final Rate USD
-                worksheet.format(f"Q2:Q{row_count}", usd_format)  # Market Rate USD
-                
-                # AED Currency formatting
-                aed_format = {
-                    "numberFormat": {"type": "CURRENCY", "pattern": "AED #,##0.00"},
-                    "horizontalAlignment": "RIGHT"
-                }
-                worksheet.format(f"L2:L{row_count}", aed_format)  # Price AED
-                worksheet.format(f"N2:N{row_count}", aed_format)  # Input Rate AED
-                worksheet.format(f"P2:P{row_count}", aed_format)  # Final Rate AED
-                worksheet.format(f"R2:R{row_count}", aed_format)  # Market Rate AED
-                
-                logger.info("✅ SMART currency formatting applied")
-                
-        except Exception as e:
-            logger.info(f"⚠️ Currency formatting failed: {e}")
-        
-        # 3️⃣ PROFESSIONAL BORDERS
-        try:
-            if row_count > 1:
-                border_format = {
-                    "borders": {
-                        "top": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
-                        "bottom": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
-                        "left": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
-                        "right": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}}
-                    }
-                }
-                worksheet.format(f"A1:AD{row_count}", border_format)  # Extended for new columns
-                logger.info("✅ PROFESSIONAL borders applied")
-        except Exception as e:
-            logger.info(f"⚠️ Border formatting failed: {e}")
-        
-        # 4️⃣ PERFECT COLUMN SIZING
-        try:
-            worksheet.columns_auto_resize(0, 35)  # Increased for new columns
-            logger.info("✅ PERFECT column sizing applied")
-        except Exception as e:
-            logger.info(f"⚠️ Column resize failed: {e}")
-        
-        logger.info(f"🎉 PROFESSIONAL formatting completed successfully!")
-        
-    except Exception as e:
-        logger.error(f"❌ Professional formatting failed: {e}")
-
-def ensure_proper_headers(worksheet):
-    """Ensure worksheet has EXACT headers matching trade data with approval and new columns"""
-    try:
-        all_values = worksheet.get_all_values()
-        
-        # Define the EXACT headers with APPROVAL COLUMNS and NEW COLUMNS
-        correct_headers = [
-            'Date', 'Time', 'Dealer', 'Operation', 'Customer', 'Gold Type', 
-            'Volume KG', 'Volume Grams', 'Pure Gold KG', 'Pure Gold Grams', 'Price USD', 'Price AED', 
-            'Input Rate USD', 'Input Rate AED', 'Final Rate USD', 'Final Rate AED', 
-            'Market Rate USD', 'Market Rate AED', 'Purity', 'Rate Type', 'P/D Amount', 'Session ID', 
-            'Approval Status', 'Approved By', 'Notes', 'Communication', 'Rate Fixed',
-            'Unfixed Time', 'Fixed Time', 'Fixed By'  # NEW columns for rate fixing
-        ]
-        
-        if not all_values:
-            # Empty sheet, add headers
-            worksheet.append_row(correct_headers)
-            logger.info("✅ Added EXACT headers with approval and rate fixing columns to empty sheet")
-            return True
-        
-        current_headers = all_values[0]
-        
-        # Check if headers need updating
-        headers_need_update = False
-        
-        # Check if we have the right number of columns
-        if len(current_headers) != len(correct_headers):
-            headers_need_update = True
-            logger.info(f"⚠️ Header count mismatch: {len(current_headers)} vs {len(correct_headers)}")
-        
-        # Check if each header matches
-        for i, correct_header in enumerate(correct_headers):
-            if i >= len(current_headers) or current_headers[i].strip() != correct_header:
-                headers_need_update = True
-                logger.info(f"⚠️ Header mismatch at position {i}: '{current_headers[i] if i < len(current_headers) else 'MISSING'}' vs '{correct_header}'")
-        
-        if headers_need_update:
-            logger.info("🔧 Updating headers to EXACT match with approval columns and rate fixing features...")
-            worksheet.update('1:1', [correct_headers])
-            logger.info("✅ Headers updated to EXACT match with approval workflow and rate fixing columns")
-            return True
-        
-        logger.info("✅ Headers already match EXACTLY")
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Error ensuring EXACT headers: {e}")
-        return False
-
-def handle_view_sheets(call):
-    """Handle view sheets with full functionality"""
-    try:
-        bot.edit_message_text("📊 Getting sheet information...", call.message.chat.id, call.message.message_id)
-        
-        success, result = get_all_sheets()
-        
-        if success:
-            sheet_list = []
-            for sheet in result:
-                sheet_list.append(f"• {sheet['name']} ({sheet['data_rows']} rows)")
-            
-            if len(sheet_list) > 10:
-                sheet_list = sheet_list[:10] + [f"... and {len(result) - 10} more sheets"]
-            
-            sheets_text = f"""📊 SHEET OVERVIEW
-
-Total Sheets: {len(result)}
-
-📋 SHEET LIST:
-{chr(10).join(sheet_list)}
-
-📊 Google Sheets Link:
-https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/edit
-
-✅ All sheets use professional approval workflow formatting!
-🎨 Color-coded status: Red=Pending, Yellow=Abhay, Orange=Mushtaq, Green=Final
-🔥 IMMEDIATE SAVE: Trades appear instantly with pending status!
-🆕 NEW COLUMNS: Communication type, Rate fixed status, Rate fixing history
-🖥️ Bloomberg Terminal formatting available!"""
-        else:
-            sheets_text = f"❌ Error getting sheets: {result}"
-        
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="view_sheets"))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-        
-        bot.edit_message_text(sheets_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    except Exception as e:
-        logger.error(f"View sheets error: {e}")
-
-def handle_format_sheet(call):
-    """Handle format sheet with full functionality"""
-    try:
-        bot.edit_message_text("🎨 Applying professional formatting...", call.message.chat.id, call.message.message_id)
-        
-        client = get_sheets_client()
-        if not client:
-            bot.edit_message_text("❌ Sheets connection failed", call.message.chat.id, call.message.message_id)
-            return
-        
-        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
-        current_month = get_uae_time().strftime('%Y_%m')
-        sheet_name = f"Gold_Trades_{current_month}"
-        
-        try:
-            worksheet = spreadsheet.worksheet(sheet_name)
-            format_sheet_beautifully(worksheet)
-            
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-            
-            bot.edit_message_text(
-                f"""🎉 PROFESSIONAL FORMATTING APPLIED!
-
-✅ Sheet: {sheet_name}
-🎨 Applied stunning approval workflow styling:
-• Rich gold headers
-• Smart currency formatting  
-• Professional borders
-• Perfect column sizing
-• Color-coded approval status
-• IMMEDIATE save support
-• NEW columns formatted
-
-📊 Your sheet now looks AMAZING with approval workflow!
-
-💡 Try the Bloomberg Terminal format for a different professional look!""",
-                call.message.chat.id,
-                call.message.message_id,
-                reply_markup=markup
-            )
-        except Exception as e:
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-            
-            bot.edit_message_text(
-                f"❌ Sheet not found: {sheet_name}\n\nCreate a trade first to generate the sheet.",
-                call.message.chat.id,
-                call.message.message_id,
-                reply_markup=markup
-            )
-    except Exception as e:
-        logger.error(f"Format sheet error: {e}")
-
-def handle_fix_headers(call):
-    """Handle fix headers with full functionality"""
-    try:
-        bot.edit_message_text("🔧 Fixing sheet headers...", call.message.chat.id, call.message.message_id)
-        
-        client = get_sheets_client()
-        if not client:
-            bot.edit_message_text("❌ Sheets connection failed", call.message.chat.id, call.message.message_id)
-            return
-        
-        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
-        current_month = get_uae_time().strftime('%Y_%m')
-        sheet_name = f"Gold_Trades_{current_month}"
-        
-        try:
-            worksheet = spreadsheet.worksheet(sheet_name)
-            ensure_proper_headers(worksheet)
-            
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-            
-            bot.edit_message_text(
-                f"""✅ HEADERS FIXED!
-
-📊 Sheet: {sheet_name}
-🔧 NOW INCLUDES ALL COLUMNS:
-• Volume KG + Volume Grams
-• Pure Gold KG + Pure Gold Grams
-• Input Rate USD/AED (Your Rate Before P/D)
-• Final Rate USD/AED (After Premium/Discount)
-• Market Rate USD/AED (Current API Rate)
-• Approval Status (Pending/Approved)
-• Approved By (Abhay, Mushtaq, Ahmadreza)
-• Notes (Comments and workflow info)
-• Communication (WhatsApp/Regular)
-• Rate Fixed (Yes/No for unfix rates)
-• Unfixed Time (When rate was unfixed) 🆕
-• Fixed Time (When rate was fixed) 🆕
-• Fixed By (Who fixed the rate) 🆕
-
-📋 All 30 columns in correct order for approval workflow!
-🔥 IMMEDIATE SAVE compatibility enabled!""",
-                call.message.chat.id,
-                call.message.message_id,
-                reply_markup=markup
-            )
-        except Exception as e:
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-            
-            bot.edit_message_text(
-                f"❌ Sheet not found: {sheet_name}\n\nCreate a trade first to generate the sheet.",
-                call.message.chat.id,
-                call.message.message_id,
-                reply_markup=markup
-            )
-    except Exception as e:
-        logger.error(f"Fix headers error: {e}")
-
-def handle_delete_sheets(call):
-    """Handle delete sheets menu with full functionality"""
-    try:
-        bot.edit_message_text("📊 Getting sheets for deletion...", call.message.chat.id, call.message.message_id)
-        
-        success, result = get_all_sheets()
-        
-        if success and len(result) > 1:  # Don't allow deleting if only one sheet
-            markup = types.InlineKeyboardMarkup()
-            
-            # Show sheets that can be deleted (skip main sheets)
-            deletable_sheets = [s for s in result if not s['name'].startswith('Sheet1') and not s['name'] == 'Main']
-            
-            for sheet in deletable_sheets[:10]:  # Limit to 10 sheets
-                markup.add(types.InlineKeyboardButton(
-                    f"🗑️ {sheet['name']} ({sheet['data_rows']} rows)",
-                    callback_data=f"delete_{sheet['name']}"
-                ))
-            
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-            
-            if deletable_sheets:
-                sheets_text = f"""🗑️ DELETE SHEETS
-
-⚠️ WARNING: This action cannot be undone!
-
-Select a sheet to delete:
-• Only trade sheets can be deleted
-• Main sheets are protected
-• Approval workflow data will be lost
-
-Available sheets: {len(deletable_sheets)}"""
-            else:
-                sheets_text = "🛡️ No deletable sheets found\n\nMain sheets are protected from deletion."
-        else:
-            sheets_text = "❌ Cannot load sheets or insufficient sheets to delete"
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-        
-        bot.edit_message_text(sheets_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    except Exception as e:
-        logger.error(f"Delete sheets menu error: {e}")
-
-# ENHANCED: Clear sheets with approval dashboard sync
-def handle_clear_sheets(call):
-    """Handle clear sheets menu with approval dashboard sync options"""
-    try:
-        bot.edit_message_text("📊 Getting clear options...", call.message.chat.id, call.message.message_id)
-        
-        success, result = get_all_sheets()
-        
-        if success:
-            markup = types.InlineKeyboardMarkup()
-            
-            for sheet in result[:8]:  # Limit to 8 sheets to leave room for special options
-                if sheet['data_rows'] > 1:  # Only show sheets with data
-                    markup.add(types.InlineKeyboardButton(
-                        f"🧹 {sheet['name']} ({sheet['data_rows']} rows)",
-                        callback_data=f"clear_{sheet['name']}"
-                    ))
-            
-            # NEW: Add special approval dashboard options
-            pending_count = len(pending_trades)
-            approved_count = len(approved_trades)
-            total_approval_trades = pending_count + approved_count
-            
-            if total_approval_trades > 0:
-                markup.add(types.InlineKeyboardButton(
-                    f"🗑️ Clear Approval Dashboard ({total_approval_trades} trades)",
-                    callback_data="clear_APPROVAL_DASHBOARD"
-                ))
-            
-            # Add option to clear both sheet and approval dashboard
-            current_month_sheet = f"Gold_Trades_{get_uae_time().strftime('%Y_%m')}"
-            current_sheet_exists = any(s['name'] == current_month_sheet for s in result)
-            
-            if current_sheet_exists and total_approval_trades > 0:
-                markup.add(types.InlineKeyboardButton(
-                    f"🔥 Clear Current Sheet + Approval Dashboard",
-                    callback_data=f"clear_BOTH_{current_month_sheet}"
-                ))
-            
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-            
-            sheets_text = f"""🧹 CLEAR DATA OPTIONS
-
-🗂️ SHEET DATA:
-• Headers will be preserved
-• Only data rows will be removed
-• Cannot be undone
-
-📋 APPROVAL DASHBOARD:
-• Pending trades: {pending_count}
-• Approved trades: {approved_count}
-• Total approval trades: {total_approval_trades}
-
-🔥 SYNC OPTIONS:
-• Clear sheet only (approval dashboard remains)
-• Clear approval dashboard only (sheets remain)
-• Clear both simultaneously (full reset)
-
-⚠️ Choose what to clear:"""
-        else:
-            sheets_text = "❌ Cannot load sheets"
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-        
-        bot.edit_message_text(sheets_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    except Exception as e:
-        logger.error(f"Clear sheets menu error: {e}")
-
-def delete_sheet(sheet_name):
-    """Delete a specific sheet"""
-    try:
-        client = get_sheets_client()
-        if not client:
-            return False, "Sheets client failed"
-            
-        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
-        
-        try:
-            worksheet = spreadsheet.worksheet(sheet_name)
-            spreadsheet.del_worksheet(worksheet)
-            logger.info(f"✅ Deleted sheet: {sheet_name}")
-            return True, f"Sheet '{sheet_name}' deleted successfully"
-        except Exception as e:
-            return False, f"Sheet '{sheet_name}' not found or cannot be deleted"
-            
-    except Exception as e:
-        logger.error(f"❌ Delete sheet error: {e}")
-        return False, str(e)
-
-# ENHANCED: Clear sheet with approval dashboard sync
-def clear_sheet(sheet_name, keep_headers=True, clear_approval_dashboard=False):
-    """Clear sheet data while optionally keeping headers AND sync approval dashboard"""
-    try:
-        client = get_sheets_client()
-        if not client:
-            return False, "Sheets client failed"
-            
-        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
-        
-        try:
-            worksheet = spreadsheet.worksheet(sheet_name)
-            
-            cleared_rows = 0
-            if keep_headers:
-                # Clear everything except the first row (headers)
-                all_values = worksheet.get_all_values()
-                if len(all_values) > 1:
-                    range_to_clear = f"A2:AD{len(all_values)}"  # Extended for new columns
-                    worksheet.batch_clear([range_to_clear])
-                    cleared_rows = len(all_values) - 1
-                    logger.info(f"✅ Cleared {cleared_rows} data rows from sheet: {sheet_name} (kept headers)")
-                else:
-                    logger.info(f"✅ Sheet '{sheet_name}' was already empty")
-            else:
-                # Clear everything including headers
-                all_values = worksheet.get_all_values()
-                cleared_rows = len(all_values)
-                worksheet.clear()
-                logger.info(f"✅ Completely cleared sheet: {sheet_name}")
-            
-            # NEW: Also clear approval dashboard if requested
-            if clear_approval_dashboard:
-                pending_count = len(pending_trades)
-                approved_count = len(approved_trades)
-                
-                # Clear all pending and approved trades
-                pending_trades.clear()
-                approved_trades.clear()
-                
-                logger.info(f"🗑️ Cleared approval dashboard: {pending_count} pending + {approved_count} approved trades")
-                
-                return True, f"Sheet '{sheet_name}' cleared ({cleared_rows} rows) + Approval dashboard cleared ({pending_count + approved_count} trades)"
-            else:
-                if cleared_rows > 0:
-                    return True, f"Data cleared from '{sheet_name}' ({cleared_rows} rows, headers preserved)"
-                else:
-                    return True, f"Sheet '{sheet_name}' was already empty"
-                
-        except Exception as e:
-            return False, f"Sheet '{sheet_name}' not found"
-            
-    except Exception as e:
-        logger.error(f"❌ Clear sheet error: {e}")
-        return False, str(e)
-
-# ENHANCED: Handle sheet actions with approval dashboard sync
-def handle_sheet_action(call):
-    """Handle sheet delete/clear actions with enhanced approval dashboard sync"""
-    try:
-        if call.data.startswith('delete_') and not call.data.startswith('delete_row_') and not call.data.startswith('delete_trade_'):
-            sheet_name = call.data.replace('delete_', '')
-            bot.edit_message_text(f"🗑️ Deleting sheet: {sheet_name}...", call.message.chat.id, call.message.message_id)
-            
-            success, message = delete_sheet(sheet_name)
-            
-            if success:
-                result_text = f"✅ {message}"
-            else:
-                result_text = f"❌ {message}"
-            
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🗑️ Delete More", callback_data="delete_sheets"))
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-            
-            bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-        
-        elif call.data.startswith('clear_'):
-            if call.data == "clear_APPROVAL_DASHBOARD":
-                # NEW: Clear only approval dashboard
-                bot.edit_message_text("🗑️ Clearing approval dashboard...", call.message.chat.id, call.message.message_id)
-                
-                pending_count = len(pending_trades)
-                approved_count = len(approved_trades)
-                
-                pending_trades.clear()
-                approved_trades.clear()
-                
-                result_text = f"✅ Approval Dashboard Cleared Successfully\n\nRemoved:\n• {pending_count} pending trades\n• {approved_count} approved trades\n• Total: {pending_count + approved_count} trades\n\n⚠️ Sheet data remains unchanged"
-                
-            elif call.data.startswith('clear_BOTH_'):
-                # NEW: Clear both sheet and approval dashboard
-                sheet_name = call.data.replace('clear_BOTH_', '')
-                bot.edit_message_text(f"🔥 Clearing sheet + approval dashboard...", call.message.chat.id, call.message.message_id)
-                
-                success, message = clear_sheet(sheet_name, keep_headers=True, clear_approval_dashboard=True)
-                
-                if success:
-                    result_text = f"✅ {message}"
-                else:
-                    result_text = f"❌ {message}"
-                    
-            else:
-                # Regular sheet clear
-                sheet_name = call.data.replace('clear_', '')
-                bot.edit_message_text(f"🧹 Clearing sheet: {sheet_name}...", call.message.chat.id, call.message.message_id)
-                
-                success, message = clear_sheet(sheet_name, keep_headers=True, clear_approval_dashboard=False)
-                
-                if success:
-                    result_text = f"✅ {message}\n\n⚠️ Approval dashboard trades remain active"
-                else:
-                    result_text = f"❌ {message}"
-            
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🧹 Clear More", callback_data="clear_sheets"))
-            markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
-            
-            bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-            
-    except Exception as e:
-        logger.error(f"Sheet action error: {e}")
-
-# Handle trade text inputs including approval workflow
-@bot.message_handler(func=lambda message: True)
-def handle_text(message):
-    """Handle text messages including approval workflow inputs and delete row"""
-    try:
-        user_id = message.from_user.id
-        text = message.text.strip()
-        
-        if user_id not in user_sessions:
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🚀 START", callback_data="start"))
-            bot.send_message(message.chat.id, "Please use /start", reply_markup=markup)
-            return
-        
-        session_data = user_sessions[user_id]
-        
-        # PIN authentication
-        if session_data.get("step") == "awaiting_pin":
-            try:
-                bot.delete_message(message.chat.id, message.message_id)
-                logger.info("🗑️ PIN deleted for security")
-            except:
-                pass
-            
-            if text == session_data["temp_dealer_id"]:
-                dealer = session_data["temp_dealer"]
-                user_sessions[user_id] = {"step": "authenticated", "dealer": dealer}
-                
-                markup = types.InlineKeyboardMarkup()
-                if any(p in dealer.get('permissions', []) for p in ['buy', 'sell']):
-                    markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
-                
-                # Check for fix unfix deals
-                unfixed_list = get_unfixed_trades_from_sheets()
-                if len(unfixed_list) > 0:
-                    markup.add(types.InlineKeyboardButton(f"🔧 Fix Unfixed Deals ({len(unfixed_list)})", callback_data="fix_unfixed_deals"))
-                
-                if any(p in dealer.get('permissions', []) for p in ['approve', 'reject', 'comment', 'final_approve']):
-                    markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
-                markup.add(types.InlineKeyboardButton("💰 Live Rate", callback_data="show_rate"))
-                
-                role_info = dealer.get('role', dealer['level'].title())
-                
-                bot.send_message(
-                    user_id, 
-                    f"""✅ Welcome {dealer['name']}! 
-
-🥇 Gold Trading Bot v4.9 - BLOOMBERG TERMINAL EDITION! 🖥️
-🚀 Role: {role_info}
-💰 Current Rate: {format_money(market_data['gold_usd_oz'])} USD/oz
-🇦🇪 UAE Time: {market_data['last_update']} (Updates every 2min)
-
-🔥 TRADES NOW SAVE TO SHEETS IMMEDIATELY!
-📲 Telegram notifications are ACTIVE for your approvals!
-🔧 NEW: ALL dealers can fix unfixed rates!
-🆕 Original rate flow restored for better UX!
-🖥️ Bloomberg Terminal formatting available!
-
-Ready for professional gold trading with enhanced features!""", 
-                    reply_markup=markup
-                )
-                logger.info(f"✅ Login: {dealer['name']} (ENHANCED v4.9)")
-            else:
-                bot.send_message(user_id, "❌ Wrong PIN. Please try again.")
-        
-        # Handle approval workflow inputs
-        elif session_data.get("awaiting_input"):
-            try:
-                bot.delete_message(message.chat.id, message.message_id)
-                
-                input_type = session_data["awaiting_input"]
-                trade_session = session_data.get("trade_session")
-                
-                # NEW: Handle delete row number input
-                if input_type == "delete_row_number":
-                    try:
-                        row_number = int(text)
-                        sheet_name = session_data.get("delete_sheet")
-                        dealer = session_data.get("dealer")
-                        
-                        if sheet_name and dealer:
-                            success, message_result = delete_row_from_sheet(row_number, sheet_name, dealer['name'])
-                            
-                            markup = types.InlineKeyboardMarkup()
-                            markup.add(types.InlineKeyboardButton("🗑️ Delete Another Row", callback_data="delete_row_menu"))
-                            markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
-                            
-                            if success:
-                                result_text = f"""✅ ROW DELETED SUCCESSFULLY
-
-{message_result}
-
-⚠️ NOTE: This action cannot be undone!
-
-👆 SELECT NEXT ACTION:"""
-                            else:
-                                result_text = f"""❌ DELETE FAILED
-
-{message_result}
-
-Please check the row number and try again.
-
-👆 SELECT ACTION:"""
-                            
-                            bot.send_message(user_id, result_text, reply_markup=markup)
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid row number. Please enter a number.")
-                
-                # Handle rejection reason
-                elif input_type.startswith("reject_reason_"):
-                    trade_id = input_type.replace("reject_reason_", "")
-                    dealer = session_data.get("dealer")
-                    
-                    if dealer and len(text) <= 200:
-                        success, message_result = reject_trade(trade_id, dealer['name'], text)
-                        
-                        markup = types.InlineKeyboardMarkup()
-                        markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
-                        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
-                        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
-                        
-                        if success:
-                            result_text = f"""✅ TRADE REJECTED SUCCESSFULLY
-
-{message_result}
-
-📊 SHEET STATUS:
-• Trade marked as REJECTED
-• Removed from approval workflow
-• All parties notified
-
-👆 SELECT NEXT ACTION:"""
-                            bot.send_message(user_id, result_text, reply_markup=markup)
-                        else:
-                            result_text = f"""❌ REJECTION FAILED
-
-{message_result}
-
-Please try again or contact admin.
-
-👆 SELECT ACTION:"""
-                            bot.send_message(user_id, result_text, reply_markup=markup)
-                    else:
-                        bot.send_message(user_id, "❌ Reason too long (max 200 characters)")
-                
-                # Handle adding comment
-                elif input_type.startswith("add_comment_"):
-                    trade_id = input_type.replace("add_comment_", "")
-                    dealer = session_data.get("dealer")
-                    
-                    if dealer and len(text) <= 200:
-                        success, message_result = add_comment_to_trade(trade_id, dealer['name'], text)
-                        
-                        markup = types.InlineKeyboardMarkup()
-                        markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
-                        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
-                        markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
-                        
-                        if success:
-                            result_text = f"""✅ COMMENT ADDED SUCCESSFULLY
-
-{message_result}
-
-📊 SHEET STATUS:
-• Comment added to trade record
-• Visible to all approvers
-• Included in approval history
-
-👆 SELECT NEXT ACTION:"""
-                            bot.send_message(user_id, result_text, reply_markup=markup)
-                        else:
-                            result_text = f"""❌ COMMENT FAILED
-
-{message_result}
-
-Please try again or contact admin.
-
-👆 SELECT ACTION:"""
-                            bot.send_message(user_id, result_text, reply_markup=markup)
-                    else:
-                        bot.send_message(user_id, "❌ Comment too long (max 200 characters)")
-                
-                # Handle fix custom rate input
-                elif input_type == "fix_custom_rate":
-                    try:
-                        custom_rate = safe_float(text)
-                        if 1000 <= custom_rate <= 10000:
-                            session_data["fixing_rate_type"] = "custom"
-                            session_data["fixing_rate"] = custom_rate
-                            
-                            # Go to premium/discount selection
-                            markup = types.InlineKeyboardMarkup()
-                            markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="fixpd_premium"))
-                            markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="fixpd_discount"))
-                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="fix_unfixed_deals"))
-                            
-                            bot.send_message(
-                                user_id,
-                                f"""✅ Custom Rate Set: ${custom_rate:,.2f}/oz
-
-🔧 FIX RATE - PREMIUM/DISCOUNT
-
-💰 Your Rate: ${custom_rate:,.2f}/oz
-
-🎯 SELECT PREMIUM OR DISCOUNT:
-
-💡 Premium = ADD to your rate
-💡 Discount = SUBTRACT from your rate
-
-💎 SELECT TYPE:""",
-                                reply_markup=markup
-                            )
-                        else:
-                            bot.send_message(user_id, "❌ Rate must be between $1,000 - $10,000 per ounce")
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid rate format. Please enter a number (e.g., 2650.00)")
-                
-                # Handle fix custom premium/discount amounts
-                elif input_type.startswith("fix_custom_"):
-                    pd_type = input_type.replace("fix_custom_", "")  # "premium" or "discount"
-                    try:
-                        pd_amount = safe_float(text)
-                        if 0.01 <= pd_amount <= 500:
-                            sheet_name = session_data.get("fixing_sheet")
-                            row_number = session_data.get("fixing_row")
-                            dealer = session_data.get("dealer")
-                            
-                            if sheet_name and row_number and dealer:
-                                success, message_result = fix_trade_rate(sheet_name, row_number, pd_type, pd_amount, dealer['name'])
-                                
-                                markup = types.InlineKeyboardMarkup()
-                                markup.add(types.InlineKeyboardButton("🔧 Fix More", callback_data="fix_unfixed_deals"))
-                                markup.add(types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard"))
-                                
-                                if success:
-                                    result_text = f"""✅ RATE FIXED SUCCESSFULLY!
-
-{message_result}
-
-📊 Sheet updated with new rate
-✅ Trade is now complete
-
-👆 SELECT NEXT ACTION:"""
-                                else:
-                                    result_text = f"""❌ RATE FIX FAILED
-
-{message_result}
-
-Please try again or contact admin.
-
-👆 SELECT ACTION:"""
-                                
-                                bot.send_message(user_id, result_text, reply_markup=markup)
-                        else:
-                            bot.send_message(user_id, "❌ Amount must be between $0.01 - $500.00 per ounce")
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid amount format. Please enter a number (e.g., 25.50)")
-                
-                # FIXED: Handle quantity input - SUPPORTS DECIMALS
-                elif input_type == "quantity" and trade_session:
-                    try:
-                        quantity = float(text)  # CHANGED: Allow decimal quantities
-                        if 0.01 <= quantity <= 10000:  # CHANGED: Allow small decimals
-                            # Calculate total weight based on quantity
-                            weight_per_piece_grams = trade_session.gold_type['weight_grams']
-                            total_weight_grams = quantity * weight_per_piece_grams
-                            total_weight_kg = total_weight_grams / 1000
-                            
-                            trade_session.volume_kg = total_weight_kg
-                            trade_session.volume_grams = total_weight_grams
-                            trade_session.quantity = quantity
-                            trade_session.step = "purity"
-                            
-                            markup = types.InlineKeyboardMarkup()
-                            for purity in GOLD_PURITIES:
-                                markup.add(types.InlineKeyboardButton(
-                                    f"⚖️ {purity['name']}",
-                                    callback_data=f"purity_{purity['value']}"
-                                ))
-                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
-                            
-                            # Format quantity display properly for decimals
-                            qty_display = f"{quantity:g}" if quantity == int(quantity) else f"{quantity:.3f}".rstrip('0').rstrip('.')
-                            
-                            bot.send_message(
-                                user_id,
-                                f"""✅ Quantity set: {qty_display} × {trade_session.gold_type['name']}
-✅ Total Weight: {format_weight_combined(total_weight_kg)}
-
-📊 NEW TRADE - STEP 4/9 (PURITY)
-
-⚖️ SELECT PURITY:""",
-                                reply_markup=markup
-                            )
-                        else:
-                            bot.send_message(user_id, "❌ Quantity must be 0.01-10000 pieces")
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid quantity. Enter number like: 2.5")
-                
-                elif input_type == "volume" and trade_session:
-                    volume = safe_float(text)
-                    if 0.001 <= volume <= 1000:
-                        trade_session.volume_kg = volume
-                        trade_session.volume_grams = kg_to_grams(volume)
-                        
-                        markup = types.InlineKeyboardMarkup()
-                        for customer in CUSTOMERS:
-                            markup.add(types.InlineKeyboardButton(
-                                f"👤 {customer}" if customer != "Custom" else f"✏️ {customer}",
-                                callback_data=f"customer_{customer}"
-                            ))
-                        # Fixed: Proper back navigation for volume
-                        if hasattr(trade_session, 'gold_purity') and trade_session.gold_purity:
-                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{trade_session.gold_purity['value']}"))
-                        else:
-                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
-                        
-                        volume_oz = grams_to_oz(kg_to_grams(volume))
-                        
-                        bot.send_message(
-                            user_id,
-                            f"✅ Volume set: {format_weight_combined(volume)} = {volume_oz:.2f} troy oz\n\n📊 NEW TRADE - STEP 5/9 (CUSTOMER)\n\n👤 SELECT CUSTOMER:",
-                            reply_markup=markup
-                        )
-                    else:
-                        bot.send_message(user_id, "❌ Volume must be 0.001-1000 KG")
-                
-                elif input_type == "customer" and trade_session:
-                    if len(text) <= 50:
-                        trade_session.customer = text
-                        trade_session.step = "communication"
-                        
-                        markup = types.InlineKeyboardMarkup()
-                        markup.add(types.InlineKeyboardButton("💬 WhatsApp", callback_data="comm_WhatsApp"))
-                        markup.add(types.InlineKeyboardButton("📱 Regular", callback_data="comm_Regular"))
-                        # Fixed: Proper back navigation for customer
-                        if hasattr(trade_session, 'quantity') and trade_session.quantity:
-                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{trade_session.gold_purity['value']}"))
-                        else:
-                            preset_found = False
-                            for preset in VOLUME_PRESETS:
-                                if abs(trade_session.volume_kg - preset) < 0.001:
-                                    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"volume_{preset}"))
-                                    preset_found = True
-                                    break
-                            if not preset_found:
-                                markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="volume_custom"))
-                        
-                        bot.send_message(
-                            user_id,
-                            f"""✅ Customer: {text}
-
-📊 NEW TRADE - STEP 6/9 (COMMUNICATION)
-
-📱 SELECT COMMUNICATION TYPE:
-
-• 💬 WhatsApp: Customer prefers WhatsApp
-• 📱 Regular: Standard communication
-
-💡 SELECT PREFERENCE:""",
-                            reply_markup=markup
-                        )
-                    else:
-                        bot.send_message(user_id, "❌ Name too long (max 50)")
-                
-                elif input_type == "custom_rate" and trade_session:
-                    try:
-                        custom_rate = safe_float(text)
-                        if 1000 <= custom_rate <= 10000:
-                            trade_session.rate_per_oz = custom_rate
-                            trade_session.step = "pd_type"
-                            
-                            markup = types.InlineKeyboardMarkup()
-                            markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="pd_premium"))
-                            markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="pd_discount"))
-                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{trade_session.communication_type}"))
-                            
-                            bot.send_message(
-                                user_id,
-                                f"""✅ Custom Rate Set: ${custom_rate:,.2f}/oz
-
-📊 NEW TRADE - STEP 8/9 (PREMIUM/DISCOUNT)
-
-🎯 SELECT PREMIUM OR DISCOUNT:
-
-💡 Premium = ADD to rate
-💡 Discount = SUBTRACT from rate
-
-💎 SELECT TYPE:""",
-                                reply_markup=markup
-                            )
-                        else:
-                            bot.send_message(user_id, "❌ Rate must be between $1,000 - $10,000 per ounce")
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid rate format. Please enter a number (e.g., 2650.00)")
-                
-                elif input_type == "override_rate" and trade_session:
-                    try:
-                        override_rate = safe_float(text)
-                        if 1000 <= override_rate <= 10000:
-                            trade_session.final_rate_per_oz = override_rate
-                            trade_session.step = "confirmation"
-                            
-                            # Skip premium/discount and go directly to confirmation
-                            show_confirmation(None, trade_session, user_id)
-                        else:
-                            bot.send_message(user_id, "❌ Rate must be between $1,000 - $10,000 per ounce")
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid rate format. Please enter a number (e.g., 2650.00)")
-                
-                # FIXED: Handle custom premium/discount amounts
-                elif input_type.startswith("custom_") and trade_session:
-                    pd_type = input_type.replace("custom_", "")  # "premium" or "discount"
-                    try:
-                        pd_amount = safe_float(text)
-                        if 0.01 <= pd_amount <= 500:
-                            trade_session.pd_amount = pd_amount
-                            
-                            # Calculate final rate
-                            if trade_session.rate_type == "market":
-                                base_rate = market_data['gold_usd_oz']
-                            else:  # custom
-                                base_rate = trade_session.rate_per_oz
-                            
-                            if pd_type == "premium":
-                                final_rate = base_rate + pd_amount
-                            else:  # discount
-                                final_rate = base_rate - pd_amount
-                            
-                            trade_session.final_rate_per_oz = final_rate
-                            
-                            # Show trade confirmation
-                            show_confirmation(None, trade_session, user_id)
-                        else:
-                            bot.send_message(user_id, "❌ Amount must be between $0.01 - $500.00 per ounce")
-                    except ValueError:
-                        bot.send_message(user_id, "❌ Invalid amount format. Please enter a number (e.g., 25.50)")
-                
-                del session_data["awaiting_input"]
-                
-            except ValueError:
-                bot.send_message(user_id, "❌ Invalid input")
-            except Exception as e:
-                bot.send_message(user_id, f"❌ Error: {e}")
-        
-    except Exception as e:
-        logger.error(f"❌ Text error: {e}")
-
-# ============================================================================
-# CLOUD-OPTIMIZED MAIN FUNCTION  
-# ============================================================================
-
-def main():
-    """Main function optimized for Railway cloud deployment with ENHANCED FEATURES v4.9"""
-    try:
-        logger.info("=" * 60)
-        logger.info("🥇 GOLD TRADING BOT v4.9 - BLOOMBERG TERMINAL EDITION!")
-        logger.info("=" * 60)
-        logger.info("🔧 COMPLETE FEATURES:")
-        logger.info("✅ Working gold rate API (2min updates)")
-        logger.info("✅ UAE timezone for all timestamps (UTC+4)")
-        logger.info("✅ Decimal quantities (0.25, 2.5, etc.)")
-        logger.info("✅ TT Bar weight: Exact 116.6380g (10 Tola)")
-        logger.info("🆕 v4.9 ENHANCED FEATURES:")
-        logger.info("    → Bloomberg Terminal sheet styling 🖥️")
-        logger.info("    → Fixed ALL back navigation issues ✅")
-        logger.info("    → Professional financial data display")
-        logger.info("    → ALL dealers can fix unfixed rates")
-        logger.info("    → Original rate flow restored (separate steps)")
-        logger.info("    → Fix rates with market OR custom rate")
-        logger.info("    → Full premium/discount options when fixing")
-        logger.info("    → Enhanced rate fixing history tracking")
-        logger.info("✅ All v4.8 features still working:")
-        logger.info("    → 9999 purity (99.99% pure gold)")
-        logger.info("    → WhatsApp/Regular communication preference")
-        logger.info("    → Delete specific rows from sheets (admin)")
-        logger.info("    → New bar sizes: 1g, 5g, 10g")
-        logger.info("    → Double-checked calculations")
-        logger.info("🔥 IMMEDIATE SHEET SAVING:")
-        logger.info("    → Trades save to sheets IMMEDIATELY with pending status")
-        logger.info("    → Red color for pending, changes through workflow")
-        logger.info("✅ APPROVAL WORKFLOW:")
-        logger.info("    → Abhay (Head Accountant) - First approval")
-        logger.info("    → Mushtaq (Level 2 Approver) - Second approval")
-        logger.info("    → Ahmadreza (Final Approver) - Final approval")
-        logger.info("✅ Instant Telegram notifications")
-        logger.info("✅ Color-coded sheets with approval status")
-        logger.info("✅ Professional sheet integration")
-        logger.info("✅ 24/7 Cloud Operation")
-        logger.info("=" * 60)
-        
-        # Initialize UAE time in market data
-        market_data["last_update"] = get_uae_time().strftime('%H:%M:%S')
-        
-        logger.info("🔧 Testing connections...")
-        sheets_ok, sheets_msg = test_sheets_connection()
-        logger.info(f"📊 Sheets: {sheets_msg}")
-        
-        # IMMEDIATE rate fetch on startup
-        logger.info("💰 Fetching initial gold rate...")
-        rate_ok = fetch_gold_rate()
-        if rate_ok:
-            logger.info(f"💰 Initial Rate: ${market_data['gold_usd_oz']:.2f} (UAE: {market_data['last_update']})")
-        else:
-            logger.warning(f"💰 Initial Rate fetch failed, using default: ${market_data['gold_usd_oz']:.2f}")
-        
-        # Start background rate updater
-        start_rate_updater()
-        
-        # Give the updater a moment to run
-        time.sleep(2)
-        
-        logger.info(f"✅ ENHANCED BOT v4.9 READY:")
-        logger.info(f"  💰 Gold: {format_money(market_data['gold_usd_oz'])} | {format_money_aed(market_data['gold_usd_oz'])}")
-        logger.info(f"  🇦🇪 UAE Time: {market_data['last_update']}")
-        logger.info(f"  📊 Sheets: {'Connected' if sheets_ok else 'Fallback mode'}")
-        logger.info(f"  🔥 IMMEDIATE SAVE: ENABLED")
-        logger.info(f"  ✅ Approvers Ready: Abhay, Mushtaq, Ahmadreza")
-        logger.info(f"  📲 Telegram Notifications: ACTIVE")
-        logger.info(f"  🎨 Color-coded Approval Status: ENABLED")
-        logger.info(f"  🗑️ Delete Individual Trades: ENABLED")
-        logger.info(f"  🗑️ Delete Specific Rows: ENABLED")
-        logger.info(f"  🆕 ALL Dealers Fix Rates: ENABLED")
-        logger.info(f"  🔧 Fix with Market/Custom: ENABLED")
-        logger.info(f"  📊 Original Rate Flow: RESTORED")
-        logger.info(f"  🔄 Back Buttons: FIXED")
-        logger.info(f"  🔓 Rate Fixing History: ENABLED")
-        logger.info(f"  💬 WhatsApp/Regular: ENABLED")
-        logger.info(f"  📏 New Bar Sizes: 1g, 5g, 10g ENABLED")
-        logger.info(f"  ✅ Double-Checked Calculations: ENABLED")
-        logger.info(f"  🧹 Clear Sheets + Approval Sync: ENABLED")
-        logger.info(f"  🔧 All Navigation Issues: FIXED")
-        logger.info(f"  🖥️ Bloomberg Terminal Format: ENABLED")
-        logger.info(f"  ⚡ All Features: WORKING")
-        logger.info(f"  ☁️ Platform: Railway (24/7 operation)")
-        
-        logger.info(f"📊 Sheet: https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/edit")
-        logger.info("🚀 STARTING ENHANCED GOLD TRADING SYSTEM v4.9 FOR 24/7 OPERATION...")
-        logger.info("=" * 60)
-        
-        # Start bot with cloud-optimized polling
-        while True:
-            try:
-                logger.info("🚀 Starting ENHANCED GOLD TRADING bot v4.9 polling on Railway cloud...")
-                bot.infinity_polling(
-                    timeout=30, 
-                    long_polling_timeout=30,
-                    restart_on_change=False,
-                    skip_pending=True
-                )
-            except Exception as e:
-                logger.error(f"❌ Bot polling error: {e}")
-                logger.info("🔄 Restarting in 10 seconds...")
-                time.sleep(10)
-        
-    except KeyboardInterrupt:
-        logger.info("🛑 Bot stopped by user")
-    except Exception as e:
-        logger.error(f"❌ Critical error: {e}")
-        logger.info("🔄 Attempting restart in 5 seconds...")
-        time.sleep(5)
-        main()  # Restart on critical error
-
-if __name__ == '__main__':
-    main()
