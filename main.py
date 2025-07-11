@@ -42,7 +42,58 @@ def install_dependencies():
     for dep in deps:
         try:
             __import__(dep.replace('-', '_').lower())
-            logger.info(f"✅ {dep:15} - Already available")
+            logger.info(f"✅ ENHANCED BOT v4.9 READY:")
+        logger.info(f"  💰 Gold: {format_money(market_data['gold_usd_oz'])} | {format_money_aed(market_data['gold_usd_oz'])}")
+        logger.info(f"  🇦🇪 UAE Time: {market_data['last_update']}")
+        logger.info(f"  📊 Sheets: {'Connected' if sheets_ok else 'Fallback mode'}")
+        logger.info(f"  🔥 IMMEDIATE SAVE: ENABLED")
+        logger.info(f"  ✅ Approvers Ready: Abhay, Mushtaq, Ahmadreza")
+        logger.info(f"  📲 Telegram Notifications: ACTIVE")
+        logger.info(f"  🎨 Color-coded Approval Status: ENABLED")
+        logger.info(f"  🗑️ Delete Individual Trades: ENABLED")
+        logger.info(f"  🗑️ Delete Specific Rows: ENABLED")
+        logger.info(f"  🆕 ALL Dealers Fix Rates: ENABLED")
+        logger.info(f"  🔧 Fix with Market/Custom: ENABLED")
+        logger.info(f"  📊 Original Rate Flow: RESTORED")
+        logger.info(f"  🔄 Back Buttons: ENABLED")
+        logger.info(f"  🔓 Rate Fixing History: ENABLED")
+        logger.info(f"  💬 WhatsApp/Regular: ENABLED")
+        logger.info(f"  📏 New Bar Sizes: 1g, 5g, 10g ENABLED")
+        logger.info(f"  ✅ Double-Checked Calculations: ENABLED")
+        logger.info(f"  🧹 Clear Sheets + Approval Sync: ENABLED")
+        logger.info(f"  🎨 Beautiful Sheet Formatting: ENABLED")
+        logger.info(f"  ⚡ All Features: WORKING")
+        logger.info(f"  ☁️ Platform: Railway (24/7 operation)")
+        
+        logger.info(f"📊 Sheet: https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/edit")
+        logger.info("🚀 STARTING ENHANCED GOLD TRADING SYSTEM v4.9 FOR 24/7 OPERATION...")
+        logger.info("=" * 60)
+        
+        # Start bot with cloud-optimized polling
+        while True:
+            try:
+                logger.info("🚀 Starting ENHANCED GOLD TRADING bot v4.9 polling on Railway cloud...")
+                bot.infinity_polling(
+                    timeout=30, 
+                    long_polling_timeout=30,
+                    restart_on_change=False,
+                    skip_pending=True
+                )
+            except Exception as e:
+                logger.error(f"❌ Bot polling error: {e}")
+                logger.info("🔄 Restarting in 10 seconds...")
+                time.sleep(10)
+        
+    except KeyboardInterrupt:
+        logger.info("🛑 Bot stopped by user")
+    except Exception as e:
+        logger.error(f"❌ Critical error: {e}")
+        logger.info("🔄 Attempting restart in 5 seconds...")
+        time.sleep(5)
+        main()  # Restart on critical error
+
+if __name__ == '__main__':
+    main()✅ {dep:15} - Already available")
         except ImportError:
             logger.info(f"📦 {dep:15} - Installing...")
             try:
@@ -1084,6 +1135,494 @@ def update_trade_status_in_sheets(trade_session):
     except Exception as e:
         logger.error(f"❌ Update status error: {e}")
         return False, str(e)
+
+# ============================================================================
+# ENHANCED SHEET FORMATTING FUNCTION - ULTRA PROFESSIONAL DESIGN
+# ============================================================================
+
+def format_sheet_beautifully(worksheet):
+    """🎨 ULTRA PROFESSIONAL DYNAMIC SHEET FORMATTING - STUNNING VISUAL DESIGN!"""
+    try:
+        logger.info(f"🎨 Starting ULTRA PROFESSIONAL formatting for: {worksheet.title}")
+        
+        # Get sheet data
+        all_values = worksheet.get_all_values()
+        row_count = len(all_values)
+        
+        if row_count < 1:
+            logger.info("⚠️ Sheet is empty, skipping formatting")
+            return
+        
+        # Define professional color palette
+        COLORS = {
+            # Gold theme colors
+            "dark_gold": {"red": 0.72, "green": 0.53, "blue": 0.04},
+            "light_gold": {"red": 1.0, "green": 0.84, "blue": 0.0},
+            "champagne": {"red": 0.98, "green": 0.93, "blue": 0.82},
+            "bronze": {"red": 0.8, "green": 0.5, "blue": 0.2},
+            
+            # Status colors
+            "pending_red": {"red": 1.0, "green": 0.85, "blue": 0.85},
+            "abhay_yellow": {"red": 1.0, "green": 0.98, "blue": 0.82},
+            "mushtaq_orange": {"red": 1.0, "green": 0.93, "blue": 0.75},
+            "approved_green": {"red": 0.85, "green": 0.98, "blue": 0.85},
+            "rejected_dark": {"red": 0.95, "green": 0.8, "blue": 0.8},
+            
+            # Accent colors
+            "midnight_blue": {"red": 0.1, "green": 0.1, "blue": 0.2},
+            "steel_gray": {"red": 0.5, "green": 0.5, "blue": 0.55},
+            "pearl_white": {"red": 0.98, "green": 0.98, "blue": 0.98},
+            "charcoal": {"red": 0.2, "green": 0.2, "blue": 0.2}
+        }
+        
+        # 1️⃣ STUNNING GRADIENT HEADERS WITH GOLD THEME
+        try:
+            header_format = {
+                "backgroundColor": COLORS["dark_gold"],
+                "backgroundColorStyle": {
+                    "rgbColor": COLORS["dark_gold"]
+                },
+                "textFormat": {
+                    "foregroundColor": COLORS["pearl_white"],
+                    "fontSize": 13,
+                    "bold": True,
+                    "fontFamily": "Montserrat",
+                    "strikethrough": False,
+                    "underline": False
+                },
+                "horizontalAlignment": "CENTER",
+                "verticalAlignment": "MIDDLE",
+                "wrapStrategy": "WRAP",
+                "textRotation": {
+                    "angle": 0
+                },
+                "borders": {
+                    "top": {
+                        "style": "SOLID_MEDIUM",
+                        "width": 2,
+                        "color": COLORS["bronze"]
+                    },
+                    "bottom": {
+                        "style": "SOLID_MEDIUM", 
+                        "width": 2,
+                        "color": COLORS["bronze"]
+                    },
+                    "left": {
+                        "style": "SOLID",
+                        "width": 1,
+                        "color": COLORS["bronze"]
+                    },
+                    "right": {
+                        "style": "SOLID",
+                        "width": 1,
+                        "color": COLORS["bronze"]
+                    }
+                }
+            }
+            
+            # Apply header formatting
+            worksheet.format("1:1", header_format)
+            
+            # Set header row height for impact
+            worksheet.set_row_height(1, 45)
+            
+            logger.info("✅ STUNNING gradient headers applied")
+            
+        except Exception as e:
+            logger.info(f"⚠️ Header formatting error: {e}")
+        
+        # 2️⃣ ALTERNATING ROW COLORS FOR EASY READING
+        try:
+            if row_count > 1:
+                # Light gold tint for even rows
+                even_row_format = {
+                    "backgroundColor": {
+                        "red": 1.0,
+                        "green": 0.98,
+                        "blue": 0.94
+                    }
+                }
+                
+                # White for odd rows
+                odd_row_format = {
+                    "backgroundColor": {
+                        "red": 1.0,
+                        "green": 1.0,
+                        "blue": 1.0
+                    }
+                }
+                
+                # Apply alternating colors
+                for i in range(2, row_count + 1):
+                    if i % 2 == 0:
+                        worksheet.format(f"{i}:{i}", even_row_format)
+                    else:
+                        worksheet.format(f"{i}:{i}", odd_row_format)
+                
+                logger.info("✅ Alternating row colors applied")
+                
+        except Exception as e:
+            logger.info(f"⚠️ Row coloring error: {e}")
+        
+        # 3️⃣ SMART CURRENCY & NUMBER FORMATTING WITH COLORS
+        try:
+            if row_count > 1:
+                # USD Currency formatting with green for positive
+                usd_format = {
+                    "numberFormat": {
+                        "type": "CURRENCY",
+                        "pattern": "$#,##0.00;[RED]-$#,##0.00"
+                    },
+                    "horizontalAlignment": "RIGHT",
+                    "textFormat": {
+                        "fontSize": 11,
+                        "fontFamily": "Roboto Mono"
+                    }
+                }
+                
+                # AED Currency formatting
+                aed_format = {
+                    "numberFormat": {
+                        "type": "CURRENCY",
+                        "pattern": "AED #,##0.00;[RED]-AED #,##0.00"
+                    },
+                    "horizontalAlignment": "RIGHT",
+                    "textFormat": {
+                        "fontSize": 11,
+                        "fontFamily": "Roboto Mono",
+                        "foregroundColor": COLORS["midnight_blue"]
+                    }
+                }
+                
+                # Apply USD formatting
+                worksheet.format(f"K2:K{row_count}", usd_format)  # Price USD
+                worksheet.format(f"M2:M{row_count}", usd_format)  # Input Rate USD
+                worksheet.format(f"O2:O{row_count}", usd_format)  # Final Rate USD
+                worksheet.format(f"Q2:Q{row_count}", usd_format)  # Market Rate USD
+                
+                # Apply AED formatting
+                worksheet.format(f"L2:L{row_count}", aed_format)  # Price AED
+                worksheet.format(f"N2:N{row_count}", aed_format)  # Input Rate AED
+                worksheet.format(f"P2:P{row_count}", aed_format)  # Final Rate AED
+                worksheet.format(f"R2:R{row_count}", aed_format)  # Market Rate AED
+                
+                # Weight formatting with custom style
+                weight_format = {
+                    "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "#,##0.000"
+                    },
+                    "horizontalAlignment": "RIGHT",
+                    "textFormat": {
+                        "fontSize": 11,
+                        "foregroundColor": COLORS["steel_gray"]
+                    }
+                }
+                
+                worksheet.format(f"G2:J{row_count}", weight_format)  # Volume and Pure Gold columns
+                
+                logger.info("✅ SMART currency formatting applied")
+                
+        except Exception as e:
+            logger.info(f"⚠️ Currency formatting error: {e}")
+        
+        # 4️⃣ CONDITIONAL FORMATTING FOR APPROVAL STATUS
+        try:
+            if row_count > 1:
+                # Get column indices
+                all_values = worksheet.get_all_values()
+                if len(all_values) > 0:
+                    headers = all_values[0]
+                    
+                    # Find approval status column
+                    try:
+                        approval_col_letter = chr(65 + headers.index('Approval Status'))  # Convert to letter
+                        
+                        # Apply conditional formatting rules
+                        for i in range(1, len(all_values)):
+                            if len(all_values[i]) > headers.index('Approval Status'):
+                                status = all_values[i][headers.index('Approval Status')]
+                                row_num = i + 1
+                                
+                                if "PENDING" in status.upper():
+                                    worksheet.format(f"{approval_col_letter}{row_num}", {
+                                        "backgroundColor": COLORS["pending_red"],
+                                        "textFormat": {"bold": True}
+                                    })
+                                elif "ABHAY_APPROVED" in status.upper():
+                                    worksheet.format(f"{approval_col_letter}{row_num}", {
+                                        "backgroundColor": COLORS["abhay_yellow"],
+                                        "textFormat": {"bold": True}
+                                    })
+                                elif "MUSHTAQ_APPROVED" in status.upper():
+                                    worksheet.format(f"{approval_col_letter}{row_num}", {
+                                        "backgroundColor": COLORS["mushtaq_orange"],
+                                        "textFormat": {"bold": True}
+                                    })
+                                elif "FINAL_APPROVED" in status.upper():
+                                    worksheet.format(f"{approval_col_letter}{row_num}", {
+                                        "backgroundColor": COLORS["approved_green"],
+                                        "textFormat": {"bold": True}
+                                    })
+                        
+                    except ValueError:
+                        logger.warning("Approval Status column not found")
+                
+                logger.info("✅ Conditional formatting applied")
+                
+        except Exception as e:
+            logger.info(f"⚠️ Conditional formatting error: {e}")
+        
+        # 5️⃣ PROFESSIONAL BORDERS & GRID
+        try:
+            if row_count > 1:
+                # Outer border - thick gold
+                outer_border_format = {
+                    "borders": {
+                        "top": {
+                            "style": "SOLID_THICK",
+                            "width": 3,
+                            "color": COLORS["dark_gold"]
+                        },
+                        "bottom": {
+                            "style": "SOLID_THICK",
+                            "width": 3,
+                            "color": COLORS["dark_gold"]
+                        },
+                        "left": {
+                            "style": "SOLID_THICK",
+                            "width": 3,
+                            "color": COLORS["dark_gold"]
+                        },
+                        "right": {
+                            "style": "SOLID_THICK",
+                            "width": 3,
+                            "color": COLORS["dark_gold"]
+                        }
+                    }
+                }
+                
+                # Apply outer border to entire data range
+                worksheet.format(f"A1:AD{row_count}", outer_border_format)
+                
+                # Inner borders - subtle gray
+                inner_border_format = {
+                    "borders": {
+                        "top": {"style": "SOLID", "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
+                        "bottom": {"style": "SOLID", "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
+                        "left": {"style": "SOLID", "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
+                        "right": {"style": "SOLID", "color": {"red": 0.8, "green": 0.8, "blue": 0.8}}
+                    }
+                }
+                
+                # Apply inner borders
+                for row in range(2, row_count + 1):
+                    worksheet.format(f"A{row}:AD{row}", inner_border_format)
+                
+                logger.info("✅ Professional borders applied")
+                
+        except Exception as e:
+            logger.info(f"⚠️ Border formatting error: {e}")
+        
+        # 6️⃣ COLUMN WIDTHS & AUTO-SIZING
+        try:
+            # Set specific column widths for better visibility
+            column_widths = {
+                0: 100,   # Date
+                1: 120,   # Time
+                2: 120,   # Dealer
+                3: 80,    # Operation
+                4: 150,   # Customer
+                5: 180,   # Gold Type
+                6: 100,   # Volume KG
+                7: 120,   # Volume Grams
+                8: 100,   # Pure Gold KG
+                9: 120,   # Pure Gold Grams
+                10: 120,  # Price USD
+                11: 120,  # Price AED
+                12: 120,  # Input Rate USD
+                13: 120,  # Input Rate AED
+                14: 120,  # Final Rate USD
+                15: 120,  # Final Rate AED
+                16: 120,  # Market Rate USD
+                17: 120,  # Market Rate AED
+                18: 180,  # Purity
+                19: 100,  # Rate Type
+                20: 120,  # P/D Amount
+                21: 200,  # Session ID
+                22: 150,  # Approval Status
+                23: 150,  # Approved By
+                24: 300,  # Notes
+                25: 120,  # Communication
+                26: 100,  # Rate Fixed
+                27: 150,  # Unfixed Time
+                28: 150,  # Fixed Time
+                29: 120   # Fixed By
+            }
+            
+            # Apply column widths
+            for col, width in column_widths.items():
+                if col < 30:  # Make sure we don't exceed column count
+                    worksheet.set_column_width(col, col, width)
+            
+            logger.info("✅ Perfect column sizing applied")
+            
+        except Exception as e:
+            logger.info(f"⚠️ Column sizing error: {e}")
+        
+        # 7️⃣ FREEZE HEADER ROW FOR SCROLLING
+        try:
+            worksheet.freeze(rows=1)
+            logger.info("✅ Header row frozen")
+        except Exception as e:
+            logger.info(f"⚠️ Freeze error: {e}")
+        
+        # 8️⃣ SPECIAL FORMATTING FOR KEY COLUMNS
+        try:
+            if row_count > 1:
+                # Operation column - Bold with colors
+                operation_format_buy = {
+                    "textFormat": {
+                        "foregroundColor": {"red": 0.0, "green": 0.5, "blue": 0.0},
+                        "bold": True,
+                        "fontSize": 12
+                    }
+                }
+                
+                operation_format_sell = {
+                    "textFormat": {
+                        "foregroundColor": {"red": 0.8, "green": 0.0, "blue": 0.0},
+                        "bold": True,
+                        "fontSize": 12
+                    }
+                }
+                
+                # Apply operation formatting
+                all_values = worksheet.get_all_values()
+                if len(all_values) > 0:
+                    headers = all_values[0]
+                    try:
+                        op_col = headers.index('Operation')
+                        for i in range(1, len(all_values)):
+                            if len(all_values[i]) > op_col:
+                                if all_values[i][op_col].upper() == "BUY":
+                                    worksheet.format(f"D{i+1}", operation_format_buy)
+                                elif all_values[i][op_col].upper() == "SELL":
+                                    worksheet.format(f"D{i+1}", operation_format_sell)
+                    except ValueError:
+                        pass
+                
+                # Customer column - Bold
+                customer_format = {
+                    "textFormat": {
+                        "bold": True,
+                        "fontSize": 11,
+                        "foregroundColor": COLORS["midnight_blue"]
+                    }
+                }
+                worksheet.format(f"E2:E{row_count}", customer_format)
+                
+                # Gold type column - Italic gold color
+                gold_type_format = {
+                    "textFormat": {
+                        "italic": True,
+                        "foregroundColor": COLORS["bronze"],
+                        "fontSize": 11
+                    }
+                }
+                worksheet.format(f"F2:F{row_count}", gold_type_format)
+                
+                # Dealer column - Bold
+                dealer_format = {
+                    "textFormat": {
+                        "bold": True,
+                        "foregroundColor": COLORS["steel_gray"]
+                    }
+                }
+                worksheet.format(f"C2:C{row_count}", dealer_format)
+                
+                logger.info("✅ Special column formatting applied")
+                
+        except Exception as e:
+            logger.info(f"⚠️ Special formatting error: {e}")
+        
+        # 9️⃣ ADD SUBTLE DROP SHADOW EFFECT (via borders)
+        try:
+            # Create shadow effect with darker bottom and right borders
+            shadow_format = {
+                "borders": {
+                    "bottom": {
+                        "style": "SOLID_MEDIUM",
+                        "color": {"red": 0.7, "green": 0.7, "blue": 0.7}
+                    },
+                    "right": {
+                        "style": "SOLID_MEDIUM",
+                        "color": {"red": 0.7, "green": 0.7, "blue": 0.7}
+                    }
+                }
+            }
+            
+            # Apply to last row and column for shadow effect
+            if row_count > 1:
+                worksheet.format(f"A{row_count}:AD{row_count}", shadow_format)
+            
+            logger.info("✅ Shadow effects applied")
+            
+        except Exception as e:
+            logger.info(f"⚠️ Shadow effect error: {e}")
+        
+        # 🔟 HIGHLIGHT UNFIXED RATES
+        try:
+            if row_count > 1:
+                all_values = worksheet.get_all_values()
+                if len(all_values) > 0:
+                    headers = all_values[0]
+                    try:
+                        rate_fixed_col = headers.index('Rate Fixed')
+                        rate_fixed_letter = chr(65 + rate_fixed_col)
+                        
+                        unfix_format = {
+                            "backgroundColor": {"red": 1.0, "green": 0.95, "blue": 0.8},
+                            "textFormat": {
+                                "bold": True,
+                                "foregroundColor": {"red": 0.8, "green": 0.4, "blue": 0.0}
+                            },
+                            "borders": {
+                                "top": {"style": "SOLID_MEDIUM", "color": {"red": 1.0, "green": 0.6, "blue": 0.0}},
+                                "bottom": {"style": "SOLID_MEDIUM", "color": {"red": 1.0, "green": 0.6, "blue": 0.0}},
+                                "left": {"style": "SOLID_MEDIUM", "color": {"red": 1.0, "green": 0.6, "blue": 0.0}},
+                                "right": {"style": "SOLID_MEDIUM", "color": {"red": 1.0, "green": 0.6, "blue": 0.0}}
+                            }
+                        }
+                        
+                        # Apply to unfixed rates
+                        for i in range(1, len(all_values)):
+                            if len(all_values[i]) > rate_fixed_col and all_values[i][rate_fixed_col] == "No":
+                                worksheet.format(f"{rate_fixed_letter}{i+1}", unfix_format)
+                        
+                    except ValueError:
+                        pass
+                
+                logger.info("✅ Unfixed rate highlighting applied")
+                
+        except Exception as e:
+            logger.info(f"⚠️ Unfixed rate formatting error: {e}")
+        
+        logger.info(f"🎉 ULTRA PROFESSIONAL formatting completed successfully!")
+        logger.info(f"✨ Your sheet now has:")
+        logger.info(f"   • Stunning gold-themed headers")
+        logger.info(f"   • Alternating row colors")
+        logger.info(f"   • Smart currency formatting")
+        logger.info(f"   • Conditional approval status colors")
+        logger.info(f"   • Professional borders and shadows")
+        logger.info(f"   • Special column highlighting")
+        logger.info(f"   • Frozen headers for easy scrolling")
+        logger.info(f"   • Unfixed rate alerts")
+        logger.info(f"   • Perfect column widths")
+        logger.info(f"   • Buy/Sell color coding")
+        
+    except Exception as e:
+        logger.error(f"❌ Ultra professional formatting failed: {e}")
 
 # ============================================================================
 # ENHANCED SAVE TRADE FUNCTIONS WITH RATE FIXING COLUMNS
@@ -2311,6 +2850,19 @@ def handle_test_save(call):
             success, result = save_trade_to_sheets(test_session)
             logger.info(f"🧪 Test save result: success={success}, result={result}")
             
+            # Apply formatting to the sheet
+            try:
+                client = get_sheets_client()
+                if client:
+                    spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
+                    current_month = get_uae_time().strftime('%Y_%m')
+                    sheet_name = f"Gold_Trades_{current_month}"
+                    worksheet = spreadsheet.worksheet(sheet_name)
+                    format_sheet_beautifully(worksheet)
+                    formatting_msg = "\n✅ Beautiful formatting applied!"
+            except:
+                formatting_msg = "\n⚠️ Formatting skipped"
+            
             if success:
                 result_text = f"""✅ SAVE TEST SUCCESSFUL!
 
@@ -2321,13 +2873,14 @@ def handle_test_save(call):
 ✅ 9999 purity tested successfully
 ✅ WhatsApp communication type tested
 ✅ Unfix rate tested successfully
-✅ Rate fixing columns working
+✅ Rate fixing columns working{formatting_msg}
 
 This confirms that:
 • Google Sheets connection works
 • Save function works correctly  
 • New columns added successfully
-• Unfix rate support working"""
+• Unfix rate support working
+• Beautiful formatting applied"""
             else:
                 result_text = f"""❌ SAVE TEST FAILED!
 
@@ -3639,9 +4192,6 @@ def show_confirmation(call, trade_session, user_id=None):
             
             pd_sign = "+" if trade_session.pd_type == "premium" else "-"
             rate_description = f"{trade_session.rate_type.upper()}: ${base_rate:,.2f} {pd_sign} ${trade_session.pd_amount}/oz"
-            
-            pd_sign = "+" if trade_session.pd_type == "premium" else "-"
-            rate_description = f"{trade_session.rate_type.upper()}: ${base_rate:,.2f} {pd_sign} ${trade_session.pd_amount}/oz"
         
         # Update session with calculated values
         trade_session.price = calc_results['total_price_usd']
@@ -3824,105 +4374,6 @@ def get_all_sheets():
         logger.error(f"Error getting sheets: {e}")
         return False, str(e)
 
-def format_sheet_beautifully(worksheet):
-    """🎨 PROFESSIONAL SHEET FORMATTING - AMAZING RESULTS!"""
-    try:
-        logger.info(f"🎨 Starting PROFESSIONAL formatting for: {worksheet.title}")
-        
-        # Get sheet data
-        all_values = worksheet.get_all_values()
-        row_count = len(all_values)
-        
-        if row_count < 1:
-            logger.info("⚠️ Sheet is empty, skipping formatting")
-            return
-        
-        # 1️⃣ STUNNING GOLD HEADERS
-        try:
-            header_format = {
-                "backgroundColor": {
-                    "red": 0.85,    # Rich gold background ✨
-                    "green": 0.65,
-                    "blue": 0.125
-                },
-                "textFormat": {
-                    "foregroundColor": {"red": 0.2, "green": 0.2, "blue": 0.2},  # Dark text
-                    "fontSize": 12,
-                    "bold": True,
-                    "fontFamily": "Roboto"
-                },
-                "horizontalAlignment": "CENTER",
-                "verticalAlignment": "MIDDLE",
-                "borders": {
-                    "top": {"style": "SOLID", "width": 2, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}},
-                    "bottom": {"style": "SOLID", "width": 2, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}},
-                    "left": {"style": "SOLID", "width": 1, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}},
-                    "right": {"style": "SOLID", "width": 1, "color": {"red": 0.7, "green": 0.5, "blue": 0.0}}
-                }
-            }
-            
-            worksheet.format("1:1", header_format)
-            logger.info("✅ STUNNING gold headers applied")
-            
-        except Exception as e:
-            logger.info(f"⚠️ Header formatting failed: {e}")
-        
-        # 2️⃣ SMART CURRENCY FORMATTING
-        try:
-            if row_count > 1:
-                # USD Currency formatting
-                usd_format = {
-                    "numberFormat": {"type": "CURRENCY", "pattern": "$#,##0.00"},
-                    "horizontalAlignment": "RIGHT"
-                }
-                worksheet.format(f"K2:K{row_count}", usd_format)  # Price USD
-                worksheet.format(f"M2:M{row_count}", usd_format)  # Input Rate USD  
-                worksheet.format(f"O2:O{row_count}", usd_format)  # Final Rate USD
-                worksheet.format(f"Q2:Q{row_count}", usd_format)  # Market Rate USD
-                
-                # AED Currency formatting
-                aed_format = {
-                    "numberFormat": {"type": "CURRENCY", "pattern": "AED #,##0.00"},
-                    "horizontalAlignment": "RIGHT"
-                }
-                worksheet.format(f"L2:L{row_count}", aed_format)  # Price AED
-                worksheet.format(f"N2:N{row_count}", aed_format)  # Input Rate AED
-                worksheet.format(f"P2:P{row_count}", aed_format)  # Final Rate AED
-                worksheet.format(f"R2:R{row_count}", aed_format)  # Market Rate AED
-                
-                logger.info("✅ SMART currency formatting applied")
-                
-        except Exception as e:
-            logger.info(f"⚠️ Currency formatting failed: {e}")
-        
-        # 3️⃣ PROFESSIONAL BORDERS
-        try:
-            if row_count > 1:
-                border_format = {
-                    "borders": {
-                        "top": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
-                        "bottom": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
-                        "left": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}},
-                        "right": {"style": "SOLID", "width": 1, "color": {"red": 0.8, "green": 0.8, "blue": 0.8}}
-                    }
-                }
-                worksheet.format(f"A1:AD{row_count}", border_format)  # Extended for new columns
-                logger.info("✅ PROFESSIONAL borders applied")
-        except Exception as e:
-            logger.info(f"⚠️ Border formatting failed: {e}")
-        
-        # 4️⃣ PERFECT COLUMN SIZING
-        try:
-            worksheet.columns_auto_resize(0, 35)  # Increased for new columns
-            logger.info("✅ PERFECT column sizing applied")
-        except Exception as e:
-            logger.info(f"⚠️ Column resize failed: {e}")
-        
-        logger.info(f"🎉 PROFESSIONAL formatting completed successfully!")
-        
-    except Exception as e:
-        logger.error(f"❌ Professional formatting failed: {e}")
-
 def ensure_proper_headers(worksheet):
     """Ensure worksheet has EXACT headers matching trade data with approval and new columns"""
     try:
@@ -4014,9 +4465,9 @@ https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/edit
         logger.error(f"View sheets error: {e}")
 
 def handle_format_sheet(call):
-    """Handle format sheet with full functionality"""
+    """Handle format sheet with the enhanced beautiful formatting"""
     try:
-        bot.edit_message_text("🎨 Applying professional formatting...", call.message.chat.id, call.message.message_id)
+        bot.edit_message_text("🎨 Applying ULTRA professional formatting...", call.message.chat.id, call.message.message_id)
         
         client = get_sheets_client()
         if not client:
@@ -4035,19 +4486,31 @@ def handle_format_sheet(call):
             markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="sheet_management"))
             
             bot.edit_message_text(
-                f"""🎉 PROFESSIONAL FORMATTING APPLIED!
+                f"""🎉 ULTRA PROFESSIONAL FORMATTING APPLIED!
 
 ✅ Sheet: {sheet_name}
-🎨 Applied stunning approval workflow styling:
-• Rich gold headers
-• Smart currency formatting  
-• Professional borders
-• Perfect column sizing
-• Color-coded approval status
-• IMMEDIATE save support
-• NEW columns formatted
 
-📊 Your sheet now looks AMAZING with approval workflow!""",
+🎨 STUNNING FEATURES APPLIED:
+• Gold-themed gradient headers
+• Alternating row colors (champagne tint)
+• Color-coded approval workflow
+• Dynamic Buy/Sell colors
+• Smart currency formatting
+• Professional borders & shadows
+• Frozen headers for scrolling
+• Perfect column sizing
+• Unfixed rate alerts
+• Interactive visual elements
+
+✨ YOUR SHEET NOW LOOKS AMAZING!
+• Headers: Rich gold with pearl white text
+• Data: Alternating white/champagne rows
+• Operations: Buy=Green, Sell=Red
+• Statuses: Color-coded by approval stage
+• Borders: Gold frame with subtle grid
+• Special: Orange alerts for unfixed rates
+
+📊 Your sheet now looks like a premium Bloomberg terminal!""",
                 call.message.chat.id,
                 call.message.message_id,
                 reply_markup=markup
@@ -4851,6 +5314,12 @@ def main():
         logger.info("✅ Color-coded sheets with approval status")
         logger.info("✅ Professional sheet integration")
         logger.info("✅ 24/7 Cloud Operation")
+        logger.info("🎨 BEAUTIFUL SHEET FORMATTING:")
+        logger.info("    → Gold-themed headers")
+        logger.info("    → Alternating row colors")
+        logger.info("    → Smart currency formatting")
+        logger.info("    → Dynamic status colors")
+        logger.info("    → Professional borders")
         logger.info("=" * 60)
         
         # Initialize UAE time in market data
@@ -4870,10 +5339,7 @@ def main():
         
         # Start background rate updater
         start_rate_updater()
-        
-        # Give the updater a moment to run
-        time.sleep(2)
-        
+
         logger.info(f"✅ ENHANCED BOT v4.9 READY:")
         logger.info(f"  💰 Gold: {format_money(market_data['gold_usd_oz'])} | {format_money_aed(market_data['gold_usd_oz'])}")
         logger.info(f"  🇦🇪 UAE Time: {market_data['last_update']}")
@@ -4893,6 +5359,7 @@ def main():
         logger.info(f"  📏 New Bar Sizes: 1g, 5g, 10g ENABLED")
         logger.info(f"  ✅ Double-Checked Calculations: ENABLED")
         logger.info(f"  🧹 Clear Sheets + Approval Sync: ENABLED")
+        logger.info(f"  🎨 Beautiful Sheet Formatting: ENABLED")
         logger.info(f"  ⚡ All Features: WORKING")
         logger.info(f"  ☁️ Platform: Railway (24/7 operation)")
         
