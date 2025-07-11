@@ -6,6 +6,7 @@
 ✨ NEW: Fix rates with market OR custom rate option
 ✨ NEW: Full premium/discount options when fixing
 ✨ NEW: Back buttons on all screens for better navigation
+✨ NEW: Fixed all navigation issues
 ✨ FIXED: All v4.8 features still working perfectly
 """
 
@@ -1814,7 +1815,11 @@ def handle_communication_type(call):
         markup.add(types.InlineKeyboardButton("✏️ Enter Custom Rate", callback_data="rate_custom"))
         markup.add(types.InlineKeyboardButton("⚡ Rate Override", callback_data="rate_override"))
         markup.add(types.InlineKeyboardButton("🔓 Unfix Rate (Fix Later)", callback_data="rate_unfix"))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+        # FIXED: Go back to customer selection
+        if trade_session.customer in CUSTOMERS and trade_session.customer != "Custom":
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"customer_{trade_session.customer}"))
+        else:
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="customer_Custom"))
         
         bot.edit_message_text(
             f"""📊 NEW TRADE - STEP 7/9 (RATE SELECTION)
@@ -3272,7 +3277,7 @@ def handle_gold_type(call):
                 markup.add(*row)
             
             markup.add(types.InlineKeyboardButton("✏️ Custom", callback_data="volume_custom"))
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"operation_{trade_session.operation}"))
             
             bot.edit_message_text(
                 f"""📊 NEW TRADE - STEP 3/9 (VOLUME)
@@ -3344,7 +3349,7 @@ Type quantity now:""",
                 f"⚖️ {purity['name']}",
                 callback_data=f"purity_{purity['value']}"
             ))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
         
         # Format quantity display properly for decimals
         qty_display = f"{quantity:g}" if quantity == int(quantity) else f"{quantity:.3f}".rstrip('0').rstrip('.')
@@ -3409,7 +3414,8 @@ def handle_purity(call):
                 markup.add(*row)
             
             markup.add(types.InlineKeyboardButton("✏️ Custom", callback_data="volume_custom"))
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+            # FIXED: Go back to gold type selection
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
             
             bot.edit_message_text(
                 f"""📊 NEW TRADE - STEP 4/9 (VOLUME)
@@ -3433,7 +3439,11 @@ def handle_purity(call):
                     f"👤 {customer}" if customer != "Custom" else f"✏️ {customer}",
                     callback_data=f"customer_{customer}"
                 ))
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+            # FIXED: Go back to quantity selection
+            if hasattr(trade_session, 'quantity') and trade_session.quantity:
+                markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
+            else:
+                markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
             
             volume_oz = grams_to_oz(kg_to_grams(trade_session.volume_kg))
             
@@ -3470,7 +3480,13 @@ def handle_volume(call):
         if volume_data == "custom":
             user_sessions[user_id]["awaiting_input"] = "volume"
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+            # FIXED: Go back to purity selection
+            purity_value = trade_session.gold_purity['value'] if hasattr(trade_session, 'gold_purity') else None
+            if purity_value:
+                markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{purity_value}"))
+            else:
+                # If no purity selected yet, go back to gold type
+                markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
             
             bot.edit_message_text(
                 """📏 CUSTOM VOLUME
@@ -3501,7 +3517,11 @@ Type volume now:""",
                 f"👤 {customer}" if customer != "Custom" else f"✏️ {customer}",
                 callback_data=f"customer_{customer}"
             ))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+        # FIXED: Go back to purity selection
+        if hasattr(trade_session, 'gold_purity') and trade_session.gold_purity:
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{trade_session.gold_purity['value']}"))
+        else:
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
         
         volume_oz = grams_to_oz(kg_to_grams(volume_kg))
         
@@ -3534,7 +3554,22 @@ def handle_customer(call):
         if customer == "Custom":
             user_sessions[user_id]["awaiting_input"] = "customer"
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+            # FIXED: Determine correct back destination
+            if hasattr(trade_session, 'quantity') and trade_session.quantity:
+                # Came from quantity flow
+                markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{trade_session.gold_purity['value']}"))
+            elif trade_session.volume_kg:
+                # Came from volume flow - check if it matches a preset
+                preset_found = False
+                for preset in VOLUME_PRESETS:
+                    if abs(trade_session.volume_kg - preset) < 0.001:
+                        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"volume_{preset}"))
+                        preset_found = True
+                        break
+                if not preset_found:
+                    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="volume_custom"))
+            else:
+                markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{trade_session.gold_purity['value']}"))
             
             bot.edit_message_text(
                 """👤 CUSTOM CUSTOMER
@@ -3555,7 +3590,21 @@ Type name now:""",
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("💬 WhatsApp", callback_data="comm_WhatsApp"))
         markup.add(types.InlineKeyboardButton("📱 Regular", callback_data="comm_Regular"))
-        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+        # FIXED: Determine correct back destination
+        if hasattr(trade_session, 'quantity') and trade_session.quantity:
+            # Came from quantity flow
+            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{trade_session.gold_purity['value']}"))
+        else:
+            # Standard back button - try volume presets
+            preset_found = False
+            for preset in VOLUME_PRESETS:
+                if abs(trade_session.volume_kg - preset) < 0.001:
+                    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"volume_{preset}"))
+                    preset_found = True
+                    break
+            if not preset_found:
+                # If no preset matches, go to custom volume
+                markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="volume_custom"))
         
         bot.edit_message_text(
             f"""📊 NEW TRADE - STEP 6/9 (COMMUNICATION)
@@ -4658,7 +4707,7 @@ Please try again or contact admin.
                                     f"⚖️ {purity['name']}",
                                     callback_data=f"purity_{purity['value']}"
                                 ))
-                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
                             
                             # Format quantity display properly for decimals
                             qty_display = f"{quantity:g}" if quantity == int(quantity) else f"{quantity:.3f}".rstrip('0').rstrip('.')
@@ -4690,7 +4739,11 @@ Please try again or contact admin.
                                 f"👤 {customer}" if customer != "Custom" else f"✏️ {customer}",
                                 callback_data=f"customer_{customer}"
                             ))
-                        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+                        # Fixed: Proper back navigation for volume
+                        if hasattr(trade_session, 'gold_purity') and trade_session.gold_purity:
+                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{trade_session.gold_purity['value']}"))
+                        else:
+                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{trade_session.gold_type['code']}"))
                         
                         volume_oz = grams_to_oz(kg_to_grams(volume))
                         
@@ -4710,7 +4763,18 @@ Please try again or contact admin.
                         markup = types.InlineKeyboardMarkup()
                         markup.add(types.InlineKeyboardButton("💬 WhatsApp", callback_data="comm_WhatsApp"))
                         markup.add(types.InlineKeyboardButton("📱 Regular", callback_data="comm_Regular"))
-                        markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="new_trade"))
+                        # Fixed: Proper back navigation for customer
+                        if hasattr(trade_session, 'quantity') and trade_session.quantity:
+                            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{trade_session.gold_purity['value']}"))
+                        else:
+                            preset_found = False
+                            for preset in VOLUME_PRESETS:
+                                if abs(trade_session.volume_kg - preset) < 0.001:
+                                    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data=f"volume_{preset}"))
+                                    preset_found = True
+                                    break
+                            if not preset_found:
+                                markup.add(types.InlineKeyboardButton("🔙 Back", callback_data="volume_custom"))
                         
                         bot.send_message(
                             user_id,
@@ -4834,6 +4898,7 @@ def main():
         logger.info("    → Full premium/discount options when fixing")
         logger.info("    → Back buttons on all screens")
         logger.info("    → Enhanced rate fixing history tracking")
+        logger.info("    → Fixed ALL navigation issues")
         logger.info("✅ All v4.8 features still working:")
         logger.info("    → 9999 purity (99.99% pure gold)")
         logger.info("    → WhatsApp/Regular communication preference")
@@ -4887,12 +4952,13 @@ def main():
         logger.info(f"  🆕 ALL Dealers Fix Rates: ENABLED")
         logger.info(f"  🔧 Fix with Market/Custom: ENABLED")
         logger.info(f"  📊 Original Rate Flow: RESTORED")
-        logger.info(f"  🔄 Back Buttons: ENABLED")
+        logger.info(f"  🔄 Back Buttons: FIXED")
         logger.info(f"  🔓 Rate Fixing History: ENABLED")
         logger.info(f"  💬 WhatsApp/Regular: ENABLED")
         logger.info(f"  📏 New Bar Sizes: 1g, 5g, 10g ENABLED")
         logger.info(f"  ✅ Double-Checked Calculations: ENABLED")
         logger.info(f"  🧹 Clear Sheets + Approval Sync: ENABLED")
+        logger.info(f"  🔧 All Navigation Issues: FIXED")
         logger.info(f"  ⚡ All Features: WORKING")
         logger.info(f"  ☁️ Platform: Railway (24/7 operation)")
         
