@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-🥇 GOLD TRADING BOT v4.9 - COMPLETE WITH ALL FUNCTIONS RESTORED
+🥇 GOLD TRADING BOT v4.9 - COMPLETE WITH ALL FUNCTIONS RESTORED + FIXES
 ✨ FIXED: Sheet management and all missing functions
 ✨ FIXED: All back button navigation issues
 ✨ FIXED: Ahmadreza can now reject trades as final approver
 ✨ FIXED: Simplified to single AED total calculation column
 ✨ FIXED: All navigation flows work perfectly
+✨ FIXED: Unfix rate flow with premium/discount options
+✨ FIXED: Sheet saving issues
 ✨ NEW: Enhanced user experience with consistent navigation
 ✨ All v4.8 features still working perfectly
 """
@@ -1002,7 +1004,7 @@ def delete_row_from_sheet(row_number, sheet_name, deleter_name):
         return False, str(e)
 
 def update_trade_status_in_sheets(trade_session):
-    """Update existing trade status in sheets"""
+    """Update existing trade status in sheets - FIXED COLUMN MAPPING"""
     try:
         logger.info(f"🔄 Updating trade status in sheets: {trade_session.session_id}")
         
@@ -1026,29 +1028,51 @@ def update_trade_status_in_sheets(trade_session):
         all_values = worksheet.get_all_values()
         row_to_update = None
         
-        for i, row in enumerate(all_values[1:], start=2):  # Skip header row
-            if len(row) > 17 and row[17] == trade_session.session_id:  # Session ID column (simplified)
-                row_to_update = i
-                break
+        # Get headers and find Session ID column
+        if len(all_values) > 0:
+            headers = all_values[0]
+            try:
+                session_id_col = headers.index('Session ID')
+                approval_status_col = headers.index('Approval Status')
+                approved_by_col = headers.index('Approved By')
+                notes_col = headers.index('Notes')
+            except ValueError as e:
+                logger.error(f"❌ Required column not found: {e}")
+                return False, f"Required column not found: {e}"
+            
+            # Find the row to update
+            for i, row in enumerate(all_values[1:], start=2):  # Skip header row
+                if len(row) > session_id_col and row[session_id_col] == trade_session.session_id:
+                    row_to_update = i
+                    break
         
         if row_to_update:
-            # Update approval status columns (simplified indices)
+            # Update approval status columns
             approval_status = getattr(trade_session, 'approval_status', 'pending')
             approved_by = getattr(trade_session, 'approved_by', [])
             comments = getattr(trade_session, 'comments', [])
             
+            # Helper function to convert column index to letter
+            def col_index_to_letter(col_index):
+                string = ""
+                col_index += 1  # Convert to 1-based
+                while col_index > 0:
+                    col_index, remainder = divmod(col_index - 1, 26)
+                    string = chr(65 + remainder) + string
+                return string
+            
             # Update the specific approval columns
             updates = [
                 {
-                    'range': f'S{row_to_update}',  # Approval Status (simplified)
+                    'range': f'{col_index_to_letter(approval_status_col)}{row_to_update}',  # Approval Status
                     'values': [[approval_status.upper()]]
                 },
                 {
-                    'range': f'T{row_to_update}',  # Approved By (simplified)
+                    'range': f'{col_index_to_letter(approved_by_col)}{row_to_update}',  # Approved By
                     'values': [[", ".join(approved_by) if approved_by else "Pending"]]
                 },
                 {
-                    'range': f'U{row_to_update}',  # Notes (simplified)
+                    'range': f'{col_index_to_letter(notes_col)}{row_to_update}',  # Notes
                     'values': [["v4.9 UAE | " + " | ".join(comments) if comments else "v4.9 UAE"]]
                 }
             ]
@@ -1070,7 +1094,9 @@ def update_trade_status_in_sheets(trade_session):
                 else:
                     color_format = {"backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}}
                 
-                worksheet.format(f"S{row_to_update}:U{row_to_update}", color_format)
+                # Apply color to approval columns only
+                approval_range = f"{col_index_to_letter(approval_status_col)}{row_to_update}:{col_index_to_letter(notes_col)}{row_to_update}"
+                worksheet.format(approval_range, color_format)
                 logger.info(f"✅ Applied {approval_status} color formatting to row {row_to_update}")
                 
             except Exception as e:
@@ -1087,11 +1113,11 @@ def update_trade_status_in_sheets(trade_session):
         return False, str(e)
 
 # ============================================================================
-# ENHANCED SAVE TRADE FUNCTIONS WITH SIMPLIFIED AED CALCULATION
+# ENHANCED SAVE TRADE FUNCTIONS WITH SIMPLIFIED AED CALCULATION - FIXED
 # ============================================================================
 
 def save_trade_to_sheets(session):
-    """Save trade to Google Sheets with SIMPLIFIED AED calculation - only one AED column"""
+    """Save trade to Google Sheets with SIMPLIFIED AED calculation - FIXED VERSION"""
     try:
         logger.info(f"🔄 Starting save_trade_to_sheets for {session.session_id}")
         
@@ -1141,7 +1167,7 @@ def save_trade_to_sheets(session):
             # For unfix rate, calculate with premium/discount to show preview
             base_rate_usd = market_data['gold_usd_oz']
             
-            if hasattr(session, 'pd_type') and hasattr(session, 'pd_amount'):
+            if hasattr(session, 'pd_type') and hasattr(session, 'pd_amount') and session.pd_type and session.pd_amount is not None:
                 # Calculate preview rate with premium/discount
                 if session.pd_type == "premium":
                     preview_rate = base_rate_usd + session.pd_amount
@@ -1158,7 +1184,7 @@ def save_trade_to_sheets(session):
                 )
                 rate_description = f"UNFIX: Market ${base_rate_usd:.2f} {pd_amount_display}"
             else:
-                # No premium/discount
+                # No premium/discount (pure unfix)
                 calc_results = calculate_trade_totals_with_override(
                     session.volume_kg,
                     session.gold_purity['value'],
@@ -1166,7 +1192,7 @@ def save_trade_to_sheets(session):
                     "unfix"
                 )
                 rate_description = f"UNFIX: Rate to be fixed later (Market ref: ${base_rate_usd:,.2f}/oz)"
-                pd_amount_display = "N/A (Unfix)"
+                pd_amount_display = "N/A (Pure Unfix)"
                 
             session.rate_fixed_status = "Unfixed"
             session.unfix_time = current_date.strftime('%Y-%m-%d %H:%M:%S')
@@ -1222,6 +1248,9 @@ def save_trade_to_sheets(session):
         unfixed_time = getattr(session, 'unfix_time', '')
         fixed_time = getattr(session, 'fixed_time', '')
         fixed_by = getattr(session, 'fixed_by', '')
+        
+        # Set price for notifications
+        session.price = total_price_usd
         
         # Row data with SIMPLIFIED columns - UAE TIME + APPROVAL + RATE FIXING
         row_data = [
@@ -1751,6 +1780,43 @@ def start_command(message):
             pass
 
 # ============================================================================
+# FIXED BACK BUTTON NAVIGATION AND HANDLER FUNCTIONS
+# ============================================================================
+
+def get_back_button(current_step, session):
+    """FIXED: Universal back button logic with proper navigation flow"""
+    if current_step == "operation":
+        return types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard")
+    elif current_step == "gold_type":
+        return types.InlineKeyboardButton("🔙 Back", callback_data="new_trade")
+    elif current_step == "quantity":
+        return types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{session.gold_type['code']}")
+    elif current_step == "volume":
+        return types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{session.gold_type['code']}")
+    elif current_step == "purity":
+        if hasattr(session, 'quantity') and session.quantity:
+            return types.InlineKeyboardButton("🔙 Back", callback_data=f"quantity_{session.quantity}")
+        else:
+            return types.InlineKeyboardButton("🔙 Back", callback_data=f"volume_{session.volume_kg}")
+    elif current_step == "customer":
+        return types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{session.gold_purity['value']}")
+    elif current_step == "communication":
+        return types.InlineKeyboardButton("🔙 Back", callback_data=f"customer_{session.customer}")
+    elif current_step == "rate_choice":
+        return types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{session.communication_type}")
+    elif current_step == "pd_type":
+        return types.InlineKeyboardButton("🔙 Back", callback_data=f"rate_{session.rate_type}")
+    elif current_step == "pd_amount":
+        return types.InlineKeyboardButton("🔙 Back", callback_data=f"pd_{session.pd_type}")
+    elif current_step == "confirm":
+        if hasattr(session, 'pd_amount') and session.pd_amount is not None:
+            return types.InlineKeyboardButton("🔙 Back", callback_data=f"{session.pd_type}_{session.pd_amount}")
+        else:
+            return types.InlineKeyboardButton("🔙 Back", callback_data=f"rate_{session.rate_type}")
+    else:
+        return types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard")
+
+# ============================================================================
 # COMPLETE CALLBACK HANDLERS - ALL WORKING FUNCTIONS RESTORED
 # ============================================================================
 
@@ -1868,30 +1934,6 @@ def handle_callbacks(call):
 # ============================================================================
 # ALL HANDLER FUNCTIONS - COMPLETE IMPLEMENTATION
 # ============================================================================
-
-def get_back_button(current_step, session):
-    """UNIVERSAL back button logic - SIMPLIFIED AND CONSISTENT"""
-    if current_step == "operation":
-        return types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard")
-    elif current_step == "gold_type":
-        return types.InlineKeyboardButton("🔙 Back", callback_data="new_trade")
-    elif current_step == "quantity" or current_step == "volume":
-        return types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{session.gold_type['code']}")
-    elif current_step == "purity":
-        if hasattr(session, 'quantity') and session.quantity:
-            return types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{session.gold_type['code']}")
-        else:
-            return types.InlineKeyboardButton("🔙 Back", callback_data=f"goldtype_{session.gold_type['code']}")
-    elif current_step == "customer":
-        return types.InlineKeyboardButton("🔙 Back", callback_data=f"purity_{session.gold_purity['value']}")
-    elif current_step == "communication":
-        return types.InlineKeyboardButton("🔙 Back", callback_data=f"customer_{session.customer}")
-    elif current_step == "rate_choice":
-        return types.InlineKeyboardButton("🔙 Back", callback_data=f"comm_{session.communication_type}")
-    elif current_step == "pd_type":
-        return types.InlineKeyboardButton("🔙 Back", callback_data=f"rate_{session.rate_type}")
-    else:
-        return types.InlineKeyboardButton("🔙 Dashboard", callback_data="dashboard")
 
 def handle_login(call):
     """Handle login with approval workflow"""
@@ -2020,8 +2062,6 @@ def handle_dashboard(call):
         bot.edit_message_text(dashboard_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
-
-# NOW I'LL ADD ALL THE COMPLETE WORKING HANDLER FUNCTIONS FROM YOUR ORIGINAL CODE:
 
 def handle_new_trade(call):
     """Start new trade - COMPLETE WORKING FUNCTION"""
@@ -2398,7 +2438,7 @@ def handle_communication_type(call):
         logger.error(f"Communication error: {e}")
 
 def handle_rate_choice(call):
-    """Handle rate choice - COMPLETE WORKING FUNCTION"""
+    """FIXED: Handle rate choice with complete unfix rate flow"""
     try:
         # AUTO-REFRESH RATE WHEN SELECTING RATE OPTION
         fetch_gold_rate()
@@ -2446,7 +2486,7 @@ def handle_rate_choice(call):
             trade_session.step = "pd_type" 
             trade_session.rate_type = "custom"
             
-            # For now, use a simple custom rate approach
+            # For now, use market rate as custom base (could be enhanced to ask for input)
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="pd_premium"))
             markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="pd_discount"))
@@ -2490,7 +2530,7 @@ def handle_rate_choice(call):
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("✅ CONFIRM TRADE", callback_data="confirm_trade"))
             markup.add(types.InlineKeyboardButton("❌ Cancel", callback_data="cancel_trade"))
-            markup.add(get_back_button("rate_choice", trade_session))
+            markup.add(get_back_button("confirm", trade_session))
             
             # Build confirmation display
             gold_desc = trade_session.gold_type['name']
@@ -2531,11 +2571,62 @@ def handle_rate_choice(call):
             )
             
         elif choice == "unfix":
-            trade_session.step = "confirm"
+            # FIXED: Unfix rate should also go through P/D selection
+            trade_session.step = "pd_type"
             trade_session.rate_type = "unfix"
             trade_session.rate_fixed_status = "Unfixed"
+            trade_session.rate_per_oz = market_data['gold_usd_oz']  # Use market as reference
             
-            # For unfix rate, we'll save with market rate reference but mark as unfixed
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("⬆️ PREMIUM", callback_data="pd_premium"))
+            markup.add(types.InlineKeyboardButton("⬇️ DISCOUNT", callback_data="pd_discount"))
+            markup.add(types.InlineKeyboardButton("🔓 No P/D (Pure Unfix)", callback_data="pd_none"))
+            markup.add(get_back_button("pd_type", trade_session))
+            
+            bot.edit_message_text(
+                f"""📊 NEW TRADE - STEP 8/9 (UNFIX RATE P/D)
+
+✅ Rate: UNFIXED RATE
+📌 Reference: Market Rate (${market_data['gold_usd_oz']:,.2f}/oz)
+⏰ UAE Time: {market_data['last_update']}
+
+🎯 SELECT PREMIUM/DISCOUNT (Optional):
+
+💡 Premium = Preview with ADD to market rate
+💡 Discount = Preview with SUBTRACT from market rate  
+🔓 No P/D = Pure unfixed rate (no preview calculation)
+
+⚠️ Note: This will be saved as UNFIXED and rate fixed later
+
+💎 SELECT TYPE:""",
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=markup
+            )
+            
+    except Exception as e:
+        logger.error(f"Rate choice error: {e}")
+
+def handle_pd_type(call):
+    """FIXED: Handle premium/discount type including none for unfix"""
+    try:
+        user_id = call.from_user.id
+        pd_type = call.data.replace("pd_", "")
+        
+        session_data = user_sessions.get(user_id, {})
+        trade_session = session_data.get("trade_session")
+        
+        if not trade_session:
+            bot.edit_message_text("❌ Session error", call.message.chat.id, call.message.message_id)
+            return
+        
+        # Handle "none" option for pure unfix
+        if pd_type == "none":
+            trade_session.pd_type = None
+            trade_session.pd_amount = 0
+            trade_session.step = "confirm"
+            
+            # For pure unfix, calculate with market rate reference
             calc_results = calculate_trade_totals_with_override(
                 trade_session.volume_kg,
                 trade_session.gold_purity['value'],
@@ -2546,14 +2637,14 @@ def handle_rate_choice(call):
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("✅ CONFIRM UNFIXED TRADE", callback_data="confirm_trade"))
             markup.add(types.InlineKeyboardButton("❌ Cancel", callback_data="cancel_trade"))
-            markup.add(get_back_button("rate_choice", trade_session))
+            markup.add(get_back_button("confirm", trade_session))
             
             # Build confirmation display
             gold_desc = trade_session.gold_type['name']
             if hasattr(trade_session, 'quantity') and trade_session.quantity:
                 gold_desc += f" (qty: {trade_session.quantity})"
             
-            confirmation_text = f"""📊 UNFIXED RATE TRADE CONFIRMATION
+            confirmation_text = f"""📊 PURE UNFIXED RATE TRADE CONFIRMATION
 
 👤 Dealer: {trade_session.dealer['name']}
 🔄 Operation: {trade_session.operation.upper()}
@@ -2567,11 +2658,11 @@ def handle_rate_choice(call):
 • Pure Gold: {format_weight_combined(calc_results['pure_gold_kg'])}
 
 💰 RATE STATUS:
-• 🔓 UNFIXED RATE - Rate to be fixed later
+• 🔓 PURE UNFIXED RATE - No premium/discount
 • Market Reference: ${market_data['gold_usd_oz']:,.2f}/oz
 • Final rate will be determined later
 
-💵 PREVIEW TOTALS (Market Reference):
+💵 REFERENCE TOTALS (Market):
 • USD Amount: {format_money(calc_results['total_price_usd'])}
 • AED Amount: {format_money_aed(calc_results['total_price_usd'])}
 
@@ -2580,7 +2671,7 @@ def handle_rate_choice(call):
 
 ⏰ UAE Time: {get_uae_time().strftime('%Y-%m-%d %H:%M:%S')}
 
-🎯 CONFIRM TO SAVE AS UNFIXED:
+🎯 CONFIRM TO SAVE AS PURE UNFIXED:
 
 👆 SELECT ACTION:"""
             
@@ -2590,23 +2681,9 @@ def handle_rate_choice(call):
                 call.message.message_id,
                 reply_markup=markup
             )
-            
-    except Exception as e:
-        logger.error(f"Rate choice error: {e}")
-
-def handle_pd_type(call):
-    """Handle premium/discount type - COMPLETE WORKING FUNCTION"""
-    try:
-        user_id = call.from_user.id
-        pd_type = call.data.replace("pd_", "")
-        
-        session_data = user_sessions.get(user_id, {})
-        trade_session = session_data.get("trade_session")
-        
-        if not trade_session:
-            bot.edit_message_text("❌ Session error", call.message.chat.id, call.message.message_id)
             return
         
+        # Normal P/D handling
         trade_session.pd_type = pd_type
         trade_session.step = "pd_amount"
         
@@ -2618,10 +2695,12 @@ def handle_pd_type(call):
         
         base_rate = trade_session.rate_per_oz if hasattr(trade_session, 'rate_per_oz') else market_data['gold_usd_oz']
         
+        rate_status = "UNFIXED" if trade_session.rate_type == "unfix" else trade_session.rate_type.title()
+        
         bot.edit_message_text(
             f"""📊 NEW TRADE - STEP 9/9 (AMOUNT)
 
-✅ Rate Type: {trade_session.rate_type.title()} + {pd_type.title()}
+✅ Rate Type: {rate_status} + {pd_type.title()}
 ✅ Base Rate: ${base_rate:,.2f}/oz
 
 🎯 SELECT {pd_type.upper()} AMOUNT:
@@ -2737,7 +2816,7 @@ Please try again or contact admin.
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("✅ CONFIRM TRADE", callback_data="confirm_trade"))
         markup.add(types.InlineKeyboardButton("❌ Cancel", callback_data="cancel_trade"))
-        markup.add(get_back_button("pd_amount", trade_session))
+        markup.add(get_back_button("confirm", trade_session))
         
         # Build gold type description
         gold_desc = trade_session.gold_type['name']
@@ -3323,7 +3402,7 @@ Error: {result}
         logger.error(f"Delete trade error: {e}")
 
 def handle_fix_unfixed_deals(call):
-    """Handle fixing unfixed deals - COMPLETE WORKING FUNCTION"""
+    """FIXED: Enhanced unfixed deals fixing for all dealers"""
     try:
         user_id = call.from_user.id
         session_data = user_sessions.get(user_id, {})
@@ -3333,7 +3412,7 @@ def handle_fix_unfixed_deals(call):
             bot.edit_message_text("❌ Please login again", call.message.chat.id, call.message.message_id)
             return
         
-        # All dealers with buy/sell permission can fix rates
+        # FIXED: All dealers with buy/sell permission can fix rates
         permissions = dealer.get('permissions', [])
         if not any(p in permissions for p in ['buy', 'sell', 'admin']):
             bot.edit_message_text("❌ No permissions to fix rates", call.message.chat.id, call.message.message_id)
@@ -3347,7 +3426,10 @@ def handle_fix_unfixed_deals(call):
         
         if unfixed_list:
             for trade in unfixed_list[:10]:  # Show first 10
-                display_text = f"📍 {trade['customer']} - {trade['operation']} - {trade['volume']} - {trade['date']}"
+                # Better display format
+                display_text = f"📍 {trade['customer']} | {trade['operation']} | {trade['volume']} | {trade['date']} {trade['time']}"
+                if len(display_text) > 60:
+                    display_text = display_text[:57] + "..."
                 markup.add(types.InlineKeyboardButton(
                     display_text,
                     callback_data=f"fix_rate_{trade['sheet_name']}_{trade['row_number']}"
@@ -3361,10 +3443,11 @@ def handle_fix_unfixed_deals(call):
         bot.edit_message_text(
             f"""🔧 FIX UNFIXED DEALS
 
-👤 Dealer: {dealer['name']}
+👤 Dealer: {dealer['name']} (ALL dealers can fix rates)
 🔍 Found: {len(unfixed_list)} unfixed trades
 
 💡 These trades were saved with unfixed rates and need rate fixing.
+🔧 You can fix rates using Market or Custom base rates with P/D.
 
 🎯 SELECT TRADE TO FIX:
 
@@ -3434,7 +3517,7 @@ def handle_fix_rate(call):
         logger.error(f"Fix rate error: {e}")
 
 def handle_fixrate_choice(call):
-    """Handle fix rate choice - COMPLETE WORKING FUNCTION"""
+    """FIXED: Handle fix rate choice with proper navigation"""
     try:
         user_id = call.from_user.id
         choice = call.data.replace("fixrate_", "")
@@ -3484,8 +3567,10 @@ def handle_fixrate_choice(call):
                 f"""🔧 FIX RATE - PREMIUM/DISCOUNT
 
 ✅ Rate Type: Custom Rate
-✅ Base Rate: ${market_data['gold_usd_oz']:,.2f}/oz (simplified)
+✅ Base Rate: ${market_data['gold_usd_oz']:,.2f}/oz (using market as example)
 ⏰ UAE Time: {market_data['last_update']}
+
+💡 Custom rate functionality can be enhanced to ask for specific rate input.
 
 🎯 SELECT PREMIUM OR DISCOUNT:
 
@@ -3863,6 +3948,8 @@ def main():
         logger.info("    → Ahmadreza can reject trades")
         logger.info("    → Simplified to single AED total calculation")
         logger.info("    → Enhanced user experience")
+        logger.info("    → Unfix rate flow with P/D options FIXED")
+        logger.info("    → Sheet saving issues FIXED")
         logger.info("✅ All previous features working:")
         logger.info("    → 9999 purity (99.99% pure gold)")
         logger.info("    → WhatsApp/Regular communication preference")
