@@ -4674,3 +4674,39 @@ def delete_trade_row(sheet_name, row_index):
         logger.error(f"❌ Failed to delete row {row_index}: {e}")
         return False
 # ===========================================================================================
+
+
+# ===================== FINAL CRASH-PROOF DASHBOARD HANDLER =====================
+def handle_dashboard(message):
+    try:
+        dealer_id = get_dealer_id(message)
+        dealer = get_dealer_by_id(dealer_id)
+        session = get_user_session(message)
+        session["step"] = "authenticated"
+
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("📊 NEW TRADE", callback_data="new_trade"))
+
+        try:
+            unfixed_list = get_unfixed_trades_from_sheets()
+            unfixed_count = len(unfixed_list) if unfixed_list else 0
+        except Exception as e:
+            unfixed_count = 0
+            logger.warning("⚠️ Could not fetch unfixed trades: " + str(e))
+
+        if unfixed_count > 0:
+            markup.add(types.InlineKeyboardButton(f"🔧 Fix Unfixed Deals ({unfixed_count})", callback_data="fix_unfixed_deals"))
+
+        if any(p in dealer.get("permissions", []) for p in ["approve", "reject", "comment", "final_approve"]):
+            markup.add(types.InlineKeyboardButton("✅ Approval Dashboard", callback_data="approval_dashboard"))
+
+        markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="dashboard"))
+
+        bot.send_message(message.chat.id, f"👤 Welcome <b>{dealer['name']}</b>
+
+Main Menu:", parse_mode="HTML", reply_markup=markup)
+
+    except Exception as e:
+        logger.error("Dashboard error: " + str(e))
+        bot.send_message(message.chat.id, "⚠️ Dashboard loading failed. Type /start to retry.")
+# ================================================================================
